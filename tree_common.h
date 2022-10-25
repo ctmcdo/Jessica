@@ -14,16 +14,15 @@
 #define MAX_OF_ANY_BASE_PIECE 2
 #define MAX_UNIQUE_COSTS 4
 
-extern char permutationsOf0to3[FOUR_FACTORIAL][NUM_PIECE_TYPES_LESS_KING];
-extern char
+extern int
     fr_coveredSet_indices[FIXED_ROOK_SCENARIOS][MAX_OF_ANY_BASE_PIECE + 1]
                          [MAX_OF_ANY_BASE_PIECE + 1][MAX_OF_ANY_BASE_PIECE + 1]
                          [MAX_OF_ANY_BASE_PIECE + 1];
-extern char fr_coveredSet_perms[FIXED_ROOK_SCENARIOS][NUM_COVERED_SETS]
-                               [FOUR_FACTORIAL][NUM_PIECE_TYPES_LESS_KING];
-extern char fr_coveredSet_perm_cost_boundaries[FIXED_ROOK_SCENARIOS]
-                                              [NUM_COVERED_SETS]
-                                              [MAX_UNIQUE_COSTS];
+extern int fr_coveredSet_perms[FIXED_ROOK_SCENARIOS][NUM_COVERED_SETS]
+                              [FOUR_FACTORIAL][NUM_PIECE_TYPES_LESS_KING];
+extern int fr_coveredSet_perm_cost_boundaries[FIXED_ROOK_SCENARIOS]
+                                             [NUM_COVERED_SETS]
+                                             [MAX_UNIQUE_COSTS];
 
 typedef struct position_node {
   // const?

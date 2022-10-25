@@ -5,7 +5,7 @@
 #include "chess_constants.h"
 
 typedef struct piece {
-  char type;
+  int type;
   uint64_t bitboard;
 } piece;
 

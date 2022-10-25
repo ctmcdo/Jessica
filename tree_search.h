@@ -14,16 +14,16 @@
 #define EDGE_ROW_MASK                                                          \
   -1 - ((1UL << (7 * BOARD_SIDE_LENGTH)) - 1) + ((1UL << BOARD_SIDE_LENGTH) - 1)
 
-char BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
+int BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
 
 void gprint(mpz_t i) { gmp_printf("%Zd\n", i); }
 
 typedef struct {
-  char indices[NUM_SIDES];
+  int indices[NUM_SIDES];
 } permutation_indices;
 
-char point_root_to_matching_child(position_node **root, mpz_t index) {
-  char i = 0;
+int point_root_to_matching_child(position_node **root, mpz_t index) {
+  int i = 0;
   for (; mpz_cmp(index, (*root)->children[i]->num_positions) >= 0; i++) {
     mpz_sub(index, index, // if rng >= positions in subtree
             (*root)->children[i]->num_positions); // then crashing is acceptable
@@ -39,10 +39,10 @@ uint64_t pass_enpassant(position_node **root, mpz_t index, position *p,
                         uint64_t *occupied_squares) {
   mpz_t rem;
   mpz_init(rem);
-  char remui;
+  int remui;
   uint64_t unoccupiable_adjacent = 0;
 
-  char enpassant_case = point_root_to_matching_child(root, index);
+  int enpassant_case = point_root_to_matching_child(root, index);
   if (enpassant_case == ENPASSANT_EDGE_AND_RIGHT) {
     mpz_fdiv_qr_ui(index, rem, index, ENPASSANT_EDGE_AND_RIGHT_VARIATIONS);
     remui = mpz_get_ui(rem);
@@ -80,8 +80,8 @@ uint64_t pass_enpassant(position_node **root, mpz_t index, position *p,
   return unoccupiable_adjacent;
 }
 
-uint64_t place_chessmen_relative_to_free_squares(char num_chessmen,
-                                                 char num_free_squares,
+uint64_t place_chessmen_relative_to_free_squares(int num_chessmen,
+                                                 int num_free_squares,
                                                  uint64_t index) {
   if (num_chessmen == 0) {
     return 0;
@@ -98,12 +98,13 @@ uint64_t place_chessmen_relative_to_free_squares(char num_chessmen,
 
     index -= binomials[num_free_squares - 1 - i][num_chessmen - 1];
   }
-  assert(false);
+
+  exit(1);
 }
 
-char pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
-                  uint64_t *bitboard) {
-  char num_chessmen = point_root_to_matching_child(root, index);
+int pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
+                 uint64_t *bitboard) {
+  int num_chessmen = point_root_to_matching_child(root, index);
   if (num_chessmen == 0) {
     return 0;
   }
@@ -111,7 +112,7 @@ char pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
   mpz_t rem;
   mpz_init(rem);
 
-  char num_free_squares = NUM_SQUARES - _mm_popcnt_u64(*occupied_squares);
+  int num_free_squares = NUM_SQUARES - _mm_popcnt_u64(*occupied_squares);
   mpz_fdiv_qr_ui(index, rem, index, binomials[num_free_squares][num_chessmen]);
   uint64_t chessmen =
       _pdep_u64(place_chessmen_relative_to_free_squares(
@@ -125,8 +126,8 @@ char pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
   return num_chessmen;
 }
 
-char pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
-                                uint64_t *occupied_squares, bool side) {
+int pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
+                               uint64_t *occupied_squares, bool side) {
   mpz_t rem;
   mpz_init(rem);
   uint64_t remui;
@@ -134,7 +135,7 @@ char pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
   uint64_t king = 0;
   uint64_t fixed_rooks = 0;
 
-  char num_fixed_rooks = point_root_to_matching_child(root, index);
+  int num_fixed_rooks = point_root_to_matching_child(root, index);
   if (num_fixed_rooks > 0) {
     king = rcb(0, KING_HOME_COLUMN_0INDEX);
   }
@@ -148,7 +149,7 @@ char pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
     fixed_rooks = 1 + (1UL << (BOARD_SIDE_LENGTH - 1));
 
   } else if (num_fixed_rooks != NO_CASTLING_RIGHTS) {
-    assert(false);
+    exit(1);
   }
 
   if (num_fixed_rooks > 0 && side == 1) {
@@ -165,9 +166,9 @@ char pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
   return num_fixed_rooks;
 }
 
-permutation_indices get_permutation_index(char pawn_slack[NUM_SIDES],
-                                          char chessmen_slack,
-                                          char *cost_boundaries[NUM_SIDES],
+permutation_indices get_permutation_index(int pawn_slack[NUM_SIDES],
+                                          int chessmen_slack,
+                                          int *cost_boundaries[NUM_SIDES],
                                           uint32_t index) {
   for (int i = 0; i < NUM_SIDES; i++) {
     for (int j = 0; j < 4; j++) {
@@ -175,20 +176,20 @@ permutation_indices get_permutation_index(char pawn_slack[NUM_SIDES],
     }
   }
 
-  char max_addn_cost0 =
+  int max_addn_cost0 =
       min3(pawn_slack[0], chessmen_slack, MAX_UNIQUE_COSTS - 1);
-  char i = 0;
+  int i = 0;
   for (; i < (max_addn_cost0 + 1); i++) { // costs are 1 apart
-    char p0 = cost_boundaries[0][i];
+    int p0 = cost_boundaries[0][i];
     assert(p0 != -1);
     if (i > 0) {
       p0 -= cost_boundaries[0][i - 1];
     }
 
-    char max_addn_cost1 =
+    int max_addn_cost1 =
         min3(pawn_slack[1], chessmen_slack - i, MAX_UNIQUE_COSTS - 1);
     for (int j = 0; j < (max_addn_cost1 + 1); j++) {
-      char p1 = cost_boundaries[1][j];
+      int p1 = cost_boundaries[1][j];
       assert(p1 != -1);
       if (j > 0) {
         p1 -= cost_boundaries[1][j - 1];
@@ -196,7 +197,7 @@ permutation_indices get_permutation_index(char pawn_slack[NUM_SIDES],
       int d = index - (p0 * p1);
       if (d < 0) {
         permutation_indices pi;
-        char offset0 = (char)(index / p1);
+        int offset0 = (int)(index / p1);
         pi.indices[0] = offset0;
         if (i > 0) {
           pi.indices[0] += cost_boundaries[0][i - 1];
@@ -248,7 +249,7 @@ position retrieve_position(position_node *root, mpz_t index) {
   occupied_squares -= EDGE_ROW_MASK;
   pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 0);
   pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 1);
-  char num_fixed_rooks[NUM_SIDES];
+  int num_fixed_rooks[NUM_SIDES];
   num_fixed_rooks[0] = _mm_popcnt_u64(p.sides[0].fixed_rooks);
   num_fixed_rooks[1] = _mm_popcnt_u64(p.sides[1].fixed_rooks);
   if (!p.enpassant && equal_num_pawns &&
@@ -260,15 +261,15 @@ position retrieve_position(position_node *root, mpz_t index) {
     }
   }
 
-  char covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
-  char promotions[NUM_SIDES] = {0};
-  char num_chessmen;
+  int covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
+  int promotions[NUM_SIDES] = {0};
+  int num_chessmen;
   for (int i = 0; i < NUM_SIDES; i++) {
     for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
       num_chessmen =
           pass_generic(&root, index, &occupied_squares, &p.sides[i].pieces[j]);
       covered_sets[i][j] = num_chessmen;
-      char d = num_chessmen - BASE_PIECES[num_fixed_rooks[i]][j];
+      int d = num_chessmen - BASE_PIECES[num_fixed_rooks[i]][j];
       if (d > 0) {
         covered_sets[i][j] = BASE_PIECES[num_fixed_rooks[i]][j];
         promotions[i] += d;
@@ -279,8 +280,8 @@ position retrieve_position(position_node *root, mpz_t index) {
     }
   }
 
-  char num_pawns[NUM_SIDES];
-  char total_base_capturable_pieces[NUM_SIDES];
+  int num_pawns[NUM_SIDES];
+  int total_base_capturable_pieces[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
 
@@ -292,7 +293,7 @@ position retrieve_position(position_node *root, mpz_t index) {
 
   for (int i = 0; i < NUM_SIDES; i++) {
     if (num_fixed_rooks[i] == NO_CASTLING_RIGHTS) {
-      char num_free_squares = NUM_SQUARES - _mm_popcnt_u64(occupied_squares);
+      int num_free_squares = NUM_SQUARES - _mm_popcnt_u64(occupied_squares);
       mpz_fdiv_qr_ui(index, rem, index, num_free_squares);
       p.sides[i].pieces[KING] =
           _pdep_u64(place_chessmen_relative_to_free_squares(1, num_free_squares,
@@ -303,8 +304,8 @@ position retrieve_position(position_node *root, mpz_t index) {
   }
   mpz_clear(rem);
 
-  char coveredSet_indices[NUM_SIDES];
-  char *cost_boundary_indices[NUM_SIDES];
+  int coveredSet_indices[NUM_SIDES];
+  int *cost_boundary_indices[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     coveredSet_indices[i] =
         fr_coveredSet_indices[num_fixed_rooks[i]][covered_sets[i][0]]
@@ -321,7 +322,7 @@ position retrieve_position(position_node *root, mpz_t index) {
       min(prom_slacks.chessmen_slack[0], prom_slacks.chessmen_slack[1]),
       cost_boundary_indices, mpz_get_ui(index));
 
-  char *permutations[NUM_SIDES];
+  int *permutations[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     permutations[i] = fr_coveredSet_perms[num_fixed_rooks[i]]
                                          [coveredSet_indices[i]][pi.indices[i]];

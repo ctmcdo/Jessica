@@ -12,8 +12,6 @@
 // I document this file from the end upwards, so you'd be best starting
 // from the bottom.
 
-// TODO: sort children by size of subtree to speed up sampling.
-
 // TODO: introduce a notion of pseudo side or something. If symmetry in pawn,
 // and potentially in pawns and fixed rooks etc, we have a pseudo side which
 // actually maps to either side0 or side1. Side0 or side1 (which ever it is) is
@@ -29,42 +27,42 @@
 
 // Can have 0, 1, or 2 rooks with castling rights
 // |{0, 1, 2}| = 3
-char BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING] = {
+int BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING] = {
     {2, 2, 2, 1}, {2, 2, 1, 1}, {2, 2, 1, 0}};
 //// b, n, r, q    b, n, r, q    b, n, q, r
 ////////////////////////////////////// <-->
 /// Notice how we switch queens and rooks ^
 
-char factorials[NUM_PIECE_TYPES_LESS_KING] = {1, 2, 6, FOUR_FACTORIAL};
-char pieces[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
+int factorials[NUM_PIECE_TYPES_LESS_KING] = {1, 2, 6, FOUR_FACTORIAL};
+int pieces[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
 
 // TODO: struct packing?
 typedef struct {
   position_node *root;
-  char free_pawns[NUM_SIDES];
-  char fixed_rooks[NUM_SIDES];
-  char num_occupiable_squares;
+  int free_pawns[NUM_SIDES];
+  int fixed_rooks[NUM_SIDES];
+  int num_occupiable_squares;
   bool enpassant;
   bool side;
 } threading_struct;
 
-uint32_t num_piece_type_permutations(char pawn_slack[NUM_SIDES],
-                                     char chessmen_slack,
-                                     char *cost_boundaries[NUM_SIDES]) {
+uint32_t num_piece_type_permutations(int pawn_slack[NUM_SIDES],
+                                     int chessmen_slack,
+                                     int *cost_boundaries[NUM_SIDES]) {
   uint32_t variations = 0;
-  char max_addn_cost0 =
+  int max_addn_cost0 =
       min3(pawn_slack[0], chessmen_slack, MAX_UNIQUE_COSTS - 1);
-  for (char i = 0; i < (max_addn_cost0 + 1); i++) { // costs are 1 apart
-    char p1 = cost_boundaries[0][i];
+  for (int i = 0; i < (max_addn_cost0 + 1); i++) { // costs are 1 apart
+    int p1 = cost_boundaries[0][i];
     if (i > 0) {
       p1 -= cost_boundaries[0][i - 1];
     }
     assert(p1 != -1);
 
     if (p1 > 0) {
-      char max_addn_cost1 =
+      int max_addn_cost1 =
           min3(pawn_slack[1], chessmen_slack - i, MAX_UNIQUE_COSTS - 1);
-      char p2 = cost_boundaries[1][max_addn_cost1];
+      int p2 = cost_boundaries[1][max_addn_cost1];
       assert(p2 != -1);
       variations += p1 * p2;
     }
@@ -78,16 +76,16 @@ uint32_t num_piece_type_permutations(char pawn_slack[NUM_SIDES],
 // later, So we can tell we have x number of this piece type, y number of this
 // piece type etc. We require two 0 levels or max level to reach leaf.
 void count_from_pieces_helper(
-    position_node *root, char pawns[NUM_SIDES], char fixed_rooks[NUM_SIDES],
-    char non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES],
-    char covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING],
-    char total_base_capturable_pieces[NUM_SIDES], char promotions[NUM_SIDES],
-    const char num_occupiable_squares, const char rel_level) {
+    position_node *root, int pawns[NUM_SIDES], int fixed_rooks[NUM_SIDES],
+    int non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES],
+    int covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING],
+    int total_base_capturable_pieces[NUM_SIDES], int promotions[NUM_SIDES],
+    const int num_occupiable_squares, const int rel_level) {
   mpz_init(root->num_positions);
 
   // rel_level is used to determine side and piece_type
   const bool side = rel_level > NUM_PIECE_TYPES_LESS_KING;
-  const char piece_type =
+  const int piece_type =
       (int)((rel_level - (side + 1)) % NUM_PIECE_TYPES_LESS_KING);
 
   slack prom_slacks =
@@ -96,16 +94,16 @@ void count_from_pieces_helper(
   // opposition's promotions. This only applies to side1 ensuring side0's
   // promotions are valid because side0 is computed assuming side1 has nothing
   // but a king on the board
-  char piece_lim3 = prom_slacks.chessmen_slack[!side];
-  char max_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
+  int piece_lim3 = prom_slacks.chessmen_slack[!side];
+  int max_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
   // Pieces are assumed to be base pieces up to max_base_pieces. Otherwise by
   // considering a piece promoted where it could be base we would be decreasing
   // the number of pieces the side with the piece-in-question can have by 1 and
   // decreasing the opposition's potential promotions by 1
   if (piece_lim3 > max_base_pieces) {
-    piece_lim3 = max_base_pieces + (char)((piece_lim3 - max_base_pieces) / 2);
+    piece_lim3 = max_base_pieces + (int)((piece_lim3 - max_base_pieces) / 2);
   }
-  char max_pieces =
+  int max_pieces =
       min3(max_base_pieces + prom_slacks.pawn_slack[side],
            max_base_pieces + prom_slacks.chessmen_slack[side], piece_lim3);
   assert(0 <= max_pieces && max_pieces <= 10);
@@ -123,7 +121,7 @@ void count_from_pieces_helper(
 
   root->children =
       (position_node **)malloc(root->num_children * sizeof(position_node *));
-  for (char i = 0; i < root->num_children; i++) {
+  for (int i = 0; i < root->num_children; i++) {
     root->children[i] = (position_node *)malloc(sizeof(position_node));
   }
 
@@ -139,30 +137,30 @@ void count_from_pieces_helper(
           BASE_PIECES[fixed_rooks[side]][piece_type];
     }
 
-    char new_base_pieces = i;
+    int new_base_pieces = i;
     if (i > BASE_PIECES[fixed_rooks[side]][piece_type]) {
       new_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
     }
     assert(0 <= new_base_pieces && new_base_pieces <= 2);
     assert(total_base_capturable_pieces[side] + new_base_pieces <= 8);
 
-    char new_total_base_capturable_pieces[NUM_SIDES];
+    int new_total_base_capturable_pieces[NUM_SIDES];
     new_total_base_capturable_pieces[!side] =
         total_base_capturable_pieces[!side];
     new_total_base_capturable_pieces[side] =
         total_base_capturable_pieces[side] + new_base_pieces;
 
-    char new_promotions[NUM_SIDES];
+    int new_promotions[NUM_SIDES];
     new_promotions[!side] = promotions[!side];
     new_promotions[side] = promotions[side] + (i - new_base_pieces);
 
     // We're at a leaf
     if ((side == 1 && i == 0) || rel_level == (2 * (NUM_PIECE_TYPES)-1)) {
-      char *cost_boundary_indices[NUM_SIDES];
+      int *cost_boundary_indices[NUM_SIDES];
       for (int j = 0; j < NUM_SIDES; j++) {
-        char csj = fr_coveredSet_indices[fixed_rooks[j]][covered_sets[j][0]]
-                                        [covered_sets[j][1]][covered_sets[j][2]]
-                                        [covered_sets[j][3]];
+        int csj = fr_coveredSet_indices[fixed_rooks[j]][covered_sets[j][0]]
+                                       [covered_sets[j][1]][covered_sets[j][2]]
+                                       [covered_sets[j][3]];
         cost_boundary_indices[j] =
             fr_coveredSet_perm_cost_boundaries[fixed_rooks[j]][csj];
       }
@@ -174,7 +172,7 @@ void count_from_pieces_helper(
               prom_slacks.pawn_slack,
               min(prom_slacks.chessmen_slack[0], prom_slacks.chessmen_slack[1]),
               cost_boundary_indices);
-      char new_num_occupiable_squares = num_occupiable_squares - i;
+      int new_num_occupiable_squares = num_occupiable_squares - i;
       for (int j = 0; j < NUM_SIDES; j++) {
         if (fixed_rooks[j] == 0) {
           variations *= new_num_occupiable_squares;
@@ -185,7 +183,7 @@ void count_from_pieces_helper(
       mpz_add_ui(root->num_positions, root->num_positions, variations);
 
     } else { // We're not at a leaf
-      char new_rel_level = rel_level + 1;
+      int new_rel_level = rel_level + 1;
       if (i == 0 || new_rel_level == (NUM_PIECE_TYPES_LESS_KING + 1)) {
         new_rel_level = NUM_PIECE_TYPES_LESS_KING + 2;
       }
@@ -208,11 +206,11 @@ void count_from_pieces_helper(
 void *count_from_pieces(void *arg) {
   threading_struct ts = *(threading_struct *)arg;
 
-  char pawns[NUM_SIDES];
-  char non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES] = {0};
-  char covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
-  char total_base_capturable_pieces[NUM_SIDES];
-  for (char i = 0; i < NUM_SIDES; i++) {
+  int pawns[NUM_SIDES];
+  int non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES] = {0};
+  int covered_sets[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
+  int total_base_capturable_pieces[NUM_SIDES];
+  for (int i = 0; i < NUM_SIDES; i++) {
     pawns[i] = ts.free_pawns[i] + ts.enpassant;
     // MAX_BISHOPS_PSIDE = 10 is the greatest number of any piece type, since
     // we can have either 2 bishops, knights or rooks and 8 promotions.
@@ -226,10 +224,12 @@ void *count_from_pieces(void *arg) {
     non_fixed_capturable_pieces[i][0] = MAX_BISHOPS_PSIDE;
     total_base_capturable_pieces[i] = ts.fixed_rooks[i];
   }
-  char promotions[NUM_SIDES] = {0};
+  int promotions[NUM_SIDES] = {0};
   count_from_pieces_helper(
       ts.root, pawns, ts.fixed_rooks, non_fixed_capturable_pieces, covered_sets,
       total_base_capturable_pieces, promotions, ts.num_occupiable_squares, 1);
+
+  return NULL;
 }
 
 // TODO: threading comment
@@ -244,7 +244,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
 
   typedef void *(*fn)(void *);
   fn next_call = count_from_fixed_rooks_and_kings;
-  char num_children = FIXED_ROOK_SCENARIOS; // 3
+  int num_children = FIXED_ROOK_SCENARIOS; // 3
   if (ts.side) {
     next_call = count_from_pieces;
     if (!ts.enpassant) {
@@ -255,12 +255,12 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
   ts.root->num_children = num_children;
   ts.root->children =
       (position_node **)malloc(ts.root->num_children * sizeof(position_node *));
-  for (char i = 0; i < ts.root->num_children; i++) {
+  for (int i = 0; i < ts.root->num_children; i++) {
     ts.root->children[i] = (position_node *)malloc(sizeof(position_node));
   }
 
   threading_struct tstructs_out[FIXED_ROOK_SCENARIOS] = {0};
-  for (char i = 0; i < num_children; i++) {
+  for (int i = 0; i < num_children; i++) {
     tstructs_out[i].root = ts.root->children[i];
     tstructs_out[i].free_pawns[0] = ts.free_pawns[0];
     tstructs_out[i].free_pawns[1] = ts.free_pawns[1];
@@ -295,7 +295,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
                    &tstructs_out[CASTLING_RIGHTS_BOTH_SIDES]);
   }
 
-  for (char i = 0; i < num_children; i++) {
+  for (int i = 0; i < num_children; i++) {
     pthread_join(thread_ids[i], NULL);
   }
 
@@ -310,25 +310,27 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
 
   // Account for symmetry avoiding fr[0] == fr[1]
   if (ts.side && !ts.enpassant && ts.free_pawns[0] == ts.free_pawns[1]) {
-    for (char i = 0; i < num_children - 1; i++) {
+    for (int i = 0; i < num_children - 1; i++) {
       mpz_mul_ui(ts.root->children[i]->num_positions,
                  ts.root->children[i]->num_positions, 2);
     }
   }
 
   mpz_init(ts.root->num_positions);
-  for (char i = 0; i < num_children; i++) {
+  for (int i = 0; i < num_children; i++) {
     mpz_add(ts.root->num_positions, ts.root->num_positions,
             ts.root->children[i]->num_positions);
   }
+
+  return NULL;
 }
 
 // The 2nd and 3rd levels represent free pawns (not pawns considered in setting
 // up enpassant)
 void count_from_free_pawns(position_node *root, position_node *eerroot,
-                           const bool side, const char num_occupiable_squares,
+                           const bool side, const int num_occupiable_squares,
                            const bool enpassant,
-                           const char previous_free_pawns) {
+                           const int previous_free_pawns) {
   root->num_children = 1 + NUM_PAWNS_PSIDE;
   if (enpassant) {
     --root->num_children;
@@ -339,14 +341,14 @@ void count_from_free_pawns(position_node *root, position_node *eerroot,
   root->children =
       (position_node **)malloc(root->num_children * sizeof(position_node *));
   if (!side && eerroot != NULL) {
-    for (char i = 0; i < root->num_children; i++) {
+    for (int i = 0; i < root->num_children; i++) {
       root->children[i] = eerroot->children[previous_free_pawns]->children[i];
     }
   } else {
-    for (char i = 0; i < root->num_children; i++) {
+    for (int i = 0; i < root->num_children; i++) {
       root->children[i] = (position_node *)malloc(sizeof(position_node));
     }
-    for (char i = 0; i < root->num_children; i++) {
+    for (int i = 0; i < root->num_children; i++) {
       if (side) {
         count_from_free_pawns(root->children[i], eerroot, 0,
                               num_occupiable_squares - i, enpassant, i);
@@ -379,7 +381,7 @@ void count_from_free_pawns(position_node *root, position_node *eerroot,
     }
   }
   mpz_init(root->num_positions);
-  for (char i = 0; i < root->num_children; i++) {
+  for (int i = 0; i < root->num_children; i++) {
     mpz_add(root->num_positions, root->num_positions,
             root->children[i]->num_positions);
   }
@@ -390,7 +392,7 @@ void *count_from_enpassant(position_node *root) {
   root->num_children = 3;
   root->children =
       (position_node **)malloc(root->num_children * sizeof(position_node *));
-  for (char i = 0; i < root->num_children; i++) {
+  for (int i = 0; i < root->num_children; i++) {
     root->children[i] = (position_node *)malloc(sizeof(position_node));
   }
 
@@ -432,10 +434,12 @@ void *count_from_enpassant(position_node *root) {
              ENPASSANT_LEFT_LESS_EDGE_VARIATIONS); // 6
 
   mpz_init(root->num_positions);
-  for (char i = 0; i < root->num_children; i++) {
+  for (int i = 0; i < root->num_children; i++) {
     mpz_add(root->num_positions, root->num_positions,
             root->children[i]->num_positions);
   }
+
+  return NULL;
 }
 
 // Our sample space is a tree. The tree must contain at least every reachable

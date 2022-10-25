@@ -54,26 +54,26 @@ enum CHECK_ERROR_CODES {
 };
 
 typedef struct checking_info {
-  char code;
-  char forced_capture_sq;
-  char forced_promotion_sq;
-  char previous_square_options;
+  int code;
+  int forced_capture_sq;
+  int forced_promotion_sq;
+  int previous_square_options;
 } checking_info;
 
 typedef struct checking_piece {
   bool type_is_queen;
-  char bit;
+  int bit;
   uint64_t ray;
-  char aspect;
+  int aspect;
 } checking_piece;
 
-uint64_t get_knight_moves(char knight_bit) {
-  char col = get_col_num(knight_bit);
-  char max = col + 2;
+uint64_t get_knight_moves(int knight_bit) {
+  int col = get_col_num(knight_bit);
+  int max = col + 2;
   if (max > (BOARD_SIDE_LENGTH - 1)) {
     max = BOARD_SIDE_LENGTH - 1;
   }
-  char min = col - 2;
+  int min = col - 2;
   if (min < 0) {
     min = 0;
   }
@@ -124,18 +124,18 @@ uint64_t rotate_bitboard_across_board_center(uint64_t n) {
   return n;
 }
 
-uint64_t get_ray_exclusive(char exclusive_bit, char aspect) {
+uint64_t get_ray_exclusive(int exclusive_bit, int aspect) {
   if (MOORE_NEIGHBOURHOOD_SIZE / 2 <= aspect) {
     exclusive_bit = (NUM_SQUARES - 1) - exclusive_bit;
   }
 
-  char row = get_row_num(exclusive_bit);
-  char col = get_col_num(exclusive_bit);
+  int row = get_row_num(exclusive_bit);
+  int col = get_col_num(exclusive_bit);
 
-  char org_aspect = aspect;
+  int org_aspect = aspect;
   aspect %= MOORE_NEIGHBOURHOOD_SIZE / 2;
 
-  uint64_t ray;
+  uint64_t ray = 0;
   switch (aspect) {
   case 0:
     ray = (ROW_1 << exclusive_bit) & (ROW_1 << (row * BOARD_SIDE_LENGTH));
@@ -144,7 +144,7 @@ uint64_t get_ray_exclusive(char exclusive_bit, char aspect) {
   case 1:
     ray = X_ROT_NEG_45_DEG << exclusive_bit;
     if (row < col) {
-      char cutoff_row = row + ((BOARD_SIDE_LENGTH - 1) - col);
+      int cutoff_row = row + ((BOARD_SIDE_LENGTH - 1) - col);
       ray &= (1UL << ((cutoff_row + 1) * BOARD_SIDE_LENGTH)) - 1;
     }
     break;
@@ -162,13 +162,13 @@ uint64_t get_ray_exclusive(char exclusive_bit, char aspect) {
     }
 
     if (row + col <= BOARD_SIDE_LENGTH - 1) {
-      char cutoff_row = row + col;
+      int cutoff_row = row + col;
       ray &= (1UL << (cutoff_row * BOARD_SIDE_LENGTH + 1)) - 1;
     }
     break;
 
   default:
-    assert(false);
+    exit(1);
   }
 
   ray &= ~(1UL << exclusive_bit);
@@ -180,7 +180,7 @@ uint64_t get_ray_exclusive(char exclusive_bit, char aspect) {
   return ray;
 }
 
-uint64_t get_trimmed_ray(uint64_t ray, char bit, char aspect) {
+uint64_t get_trimmed_ray(uint64_t ray, int bit, int aspect) {
   if (aspect < MOORE_NEIGHBOURHOOD_SIZE / 2) {
     return ray & ((1UL << bit) - 1);
   }
@@ -192,18 +192,18 @@ checking_piece get_sliding_attack_from_ahead(uint64_t pot_checking_queens,
                                              uint64_t type2_bb,
                                              uint64_t blocking_chessmen,
                                              uint64_t checking_ray) {
-  char blocking_tz = _tzcnt_u64(checking_ray & blocking_chessmen);
-  char tz = blocking_tz;
+  int blocking_tz = _tzcnt_u64(checking_ray & blocking_chessmen);
+  int tz = blocking_tz;
 
   checking_piece cp = {0};
   cp.bit = NUM_SQUARES;
-  char queen_tz = _tzcnt_u64(checking_ray & pot_checking_queens);
+  int queen_tz = _tzcnt_u64(checking_ray & pot_checking_queens);
   if (queen_tz < tz) {
     tz = queen_tz;
     cp.type_is_queen = true;
   }
 
-  char type2_tz = _tzcnt_u64(checking_ray & type2_bb);
+  int type2_tz = _tzcnt_u64(checking_ray & type2_bb);
   if (type2_tz < tz) {
     tz = type2_tz;
   }
@@ -220,18 +220,18 @@ checking_piece get_sliding_attack_from_behind(uint64_t pot_checking_queens,
                                               uint64_t type2_bb,
                                               uint64_t blocking_chessmen,
                                               uint64_t checking_ray) {
-  char blocking_lz = _lzcnt_u64(blocking_chessmen & checking_ray);
-  char lz = blocking_lz;
+  int blocking_lz = _lzcnt_u64(blocking_chessmen & checking_ray);
+  int lz = blocking_lz;
 
   checking_piece cp;
   cp.bit = NUM_SQUARES;
-  char queen_lz = _lzcnt_u64(pot_checking_queens & checking_ray);
+  int queen_lz = _lzcnt_u64(pot_checking_queens & checking_ray);
   if (queen_lz < lz) {
     lz = queen_lz;
     cp.type_is_queen = true;
   }
 
-  char type2_lz = _lzcnt_u64(type2_bb & checking_ray);
+  int type2_lz = _lzcnt_u64(type2_bb & checking_ray);
   if (type2_lz < lz) {
     lz = type2_lz;
   }
@@ -247,7 +247,7 @@ checking_piece get_sliding_attack_from_behind(uint64_t pot_checking_queens,
 
 checking_piece get_sliding_attack(uint64_t pot_checking_queens,
                                   uint64_t type2_bb, uint64_t blocking_chessmen,
-                                  char target_bit, char aspect) {
+                                  int target_bit, int aspect) {
   checking_piece cp;
   if (aspect < MOORE_NEIGHBOURHOOD_SIZE / 2) {
     cp = get_sliding_attack_from_ahead(pot_checking_queens, type2_bb,
@@ -258,7 +258,7 @@ checking_piece get_sliding_attack(uint64_t pot_checking_queens,
                                         blocking_chessmen,
                                         get_ray_exclusive(target_bit, aspect));
   } else {
-    assert(false);
+    exit(1);
   }
   cp.aspect = aspect;
 
@@ -267,10 +267,10 @@ checking_piece get_sliding_attack(uint64_t pot_checking_queens,
 
 uint64_t get_checking_pawns(uint64_t pawns, uint64_t king) {
   uint64_t checking_pawns = 0;
-  char pawn_index = _tzcnt_u64(pawns);
+  int pawn_index = _tzcnt_u64(pawns);
   while (pawn_index < NUM_SQUARES) {
-    char row = get_row_num(pawn_index);
-    char col = get_col_num(pawn_index);
+    int row = get_row_num(pawn_index);
+    int col = get_col_num(pawn_index);
     if (row > 0) {
       if (col > 0) {
         if ((1UL << (pawn_index + BOARD_SIDE_LENGTH - 1)) & king) {
@@ -293,8 +293,8 @@ uint64_t get_checking_pawns(uint64_t pawns, uint64_t king) {
 }
 
 // side 0 is never to move and hence can never be in check
-char validate_checks_side0(position p) {
-  char king_bit = get_index_of_1st_set_bit(p.sides[0].pieces[KING]);
+int validate_checks_side0(position p) {
+  int king_bit = get_index_of_1st_set_bit(p.sides[0].pieces[KING]);
   if (_mm_popcnt_u64(get_knight_moves(king_bit) & p.sides[1].pieces[KNIGHT])) {
     return SIDE0_CHECKED_BY_KNIGHT;
   }
@@ -302,7 +302,7 @@ char validate_checks_side0(position p) {
   uint64_t blocking_chessmen =
       get_occupied_squares(p) - p.sides[1].pieces[QUEEN];
   for (int i = 0; i < MOORE_NEIGHBOURHOOD_SIZE; i++) {
-    char other_piece_type = 2 * ((i + 1) % 2);
+    int other_piece_type = 2 * ((i + 1) % 2);
     uint64_t other_piece_bb = p.sides[1].pieces[other_piece_type];
     if (get_sliding_attack(p.sides[1].pieces[QUEEN], other_piece_bb,
                            blocking_chessmen - other_piece_bb, king_bit, i)
@@ -322,19 +322,19 @@ char validate_checks_side0(position p) {
 checking_info validate_checks_side1(position p) {
   checking_info ci = {0};
 
-  char king_bit = get_index_of_1st_set_bit(p.sides[1].pieces[KING]);
+  int king_bit = get_index_of_1st_set_bit(p.sides[1].pieces[KING]);
   // pretend knight on opposition's king's square. The moves such a knight can
   // make are also the squares on which knights can check the king.
   uint64_t checking_knights =
       get_knight_moves(king_bit) & p.sides[0].pieces[KNIGHT];
-  char num_checking_knights = _mm_popcnt_u64(checking_knights);
+  int num_checking_knights = _mm_popcnt_u64(checking_knights);
   // no discovery possible with 1 < knights
   if (num_checking_knights > 1) {
     ci.code = MORE_THAN_1_CHECKING_KNIGHT;
     return ci;
   }
 
-  char num_sliding_attacks[NUM_SLIDING_TYPES] = {0};
+  int num_sliding_attacks[NUM_SLIDING_TYPES] = {0};
   // sliding pieces which are attacking opposition king.
   checking_piece sliding_attacks_by_piece_type[NUM_SLIDING_TYPES] = {0};
   for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
@@ -342,7 +342,7 @@ checking_info validate_checks_side1(position p) {
     sliding_attacks_by_piece_type[i].aspect = MOORE_NEIGHBOURHOOD_SIZE;
   }
 
-  char sliding_attacks_by_direction[MOORE_NEIGHBOURHOOD_SIZE];
+  int sliding_attacks_by_direction[MOORE_NEIGHBOURHOOD_SIZE];
   for (int i = 0; i < MOORE_NEIGHBOURHOOD_SIZE; i++) {
     sliding_attacks_by_direction[i] = NUM_SQUARES;
   }
@@ -355,7 +355,7 @@ checking_info validate_checks_side1(position p) {
     // A queen can check in any line, but depending on whether the direction (i)
     // is orthogonal or diagonal the other potentially checking piece type is
     // rook or bishop, respectively.
-    char other_piece_type = 2 * ((i + 1) % 2);
+    int other_piece_type = 2 * ((i + 1) % 2);
     uint64_t other_piece_bb = p.sides[0].pieces[other_piece_type];
     checking_piece cp = get_sliding_attack(
         p.sides[0].pieces[QUEEN], p.sides[0].pieces[other_piece_type],
@@ -376,16 +376,16 @@ checking_info validate_checks_side1(position p) {
 
   uint64_t checking_pawns =
       get_checking_pawns(p.sides[0].pawns, p.sides[1].pieces[KING]);
-  char num_checking_pawns = _mm_popcnt_u64(checking_pawns);
+  int num_checking_pawns = _mm_popcnt_u64(checking_pawns);
   if (num_checking_pawns > 1) {
     ci.code = MORE_THAN_1_CHECKING_PAWN;
     return ci;
   }
 
-  char num_checking_chessmen = num_checking_knights +
-                               num_sliding_attacks[BISHOP] +
-                               num_sliding_attacks[SLIDING_QUEEN_INDEX] +
-                               num_sliding_attacks[ROOK] + num_checking_pawns;
+  int num_checking_chessmen = num_checking_knights +
+                              num_sliding_attacks[BISHOP] +
+                              num_sliding_attacks[SLIDING_QUEEN_INDEX] +
+                              num_sliding_attacks[ROOK] + num_checking_pawns;
   assert(num_checking_chessmen >= 0 && num_checking_chessmen <= 10);
 
   if (num_checking_chessmen > 2) {
@@ -437,8 +437,8 @@ checking_info validate_checks_side1(position p) {
   }
 
   /*
-  char aspect_diff = 0;
-  char aspect_total = 0;
+  int aspect_diff = 0;
+  int aspect_total = 0;
   for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
     if (sliding_attacks[i].aspect != MOORE_NEIGHBOURHOOD_SIZE) {
       if (aspect_diff < 0) {
@@ -461,15 +461,15 @@ checking_info validate_checks_side1(position p) {
 
 checking_info validate_checks(position p) {
   checking_info ci = {0};
-  char k0 = get_index_of_1st_set_bit(p.sides[0].pieces[KING]);
-  char k1 = get_index_of_1st_set_bit(p.sides[1].pieces[KING]);
+  int k0 = get_index_of_1st_set_bit(p.sides[0].pieces[KING]);
+  int k1 = get_index_of_1st_set_bit(p.sides[1].pieces[KING]);
   if (abs(get_row_num(k0) - get_row_num(k1)) < 2 &&
       abs(get_col_num(k0) - get_col_num(k1)) < 2) {
     ci.code = TOUCHING_KINGS;
     return ci;
   }
 
-  char code = validate_checks_side0(p);
+  int code = validate_checks_side0(p);
   if (code) {
     ci.code = code;
     return ci;

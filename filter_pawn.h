@@ -20,16 +20,16 @@ enum PAWN_COST_ERROR_CODES { SIDE0_TOO_EXPENSIVE = 1, SIDE1_TOO_EXPENSIVE };
 
 typedef struct CostTestStruct {
   bool enpassant;
-  char left;
-  char right;
+  int left;
+  int right;
   int tz_sum;
-  char v;
+  int v;
   double **vertices;
 } CostTestStruct;
 
 typedef struct CostStruct {
-  char side0;
-  char side1;
+  int side0;
+  int side1;
 } CostStruct;
 
 const CostTestStruct DefaultCostTestStruct = {.enpassant = false,
@@ -39,7 +39,7 @@ const CostTestStruct DefaultCostTestStruct = {.enpassant = false,
                                               .vertices = NULL,
                                               .tz_sum = 0};
 
-void assert_mask(char n, uint64_t column) {
+void assert_mask(int n, uint64_t column) {
   assert((0 <= n) && (n < 56));
   if (column != 0) {
     assert(column < rcb(7, 0));
@@ -47,23 +47,23 @@ void assert_mask(char n, uint64_t column) {
   assert(((1UL << n) & column) == 0);
 }
 
-bool is_kth_bit_set(uint64_t n, char k) {
+bool is_kth_bit_set(uint64_t n, int k) {
   assert((k >= 0) && (k < NUM_SQUARES));
   return (1UL << k) & n;
 }
 
-uint64_t get_mask_for_side0(char bp, uint64_t side0_column) {
+uint64_t get_mask_for_side0(int bp, uint64_t side0_column) {
   assert_mask(bp, side0_column);
   return (~__blsmsk_u64(1UL << bp)) & side0_column;
 }
 
-uint64_t get_mask_for_side1(char wp, uint64_t side1_column) {
+uint64_t get_mask_for_side1(int wp, uint64_t side1_column) {
   assert_mask(wp, side1_column);
   return __blsmsk_u64(1UL << wp) & side1_column;
 }
 
 void free_cost_test_struct(CostTestStruct *test_struct) {
-  for (unsigned char i = 0; i < BOARD_SIDE_LENGTH; i++) {
+  for (unsigned int i = 0; i < BOARD_SIDE_LENGTH; i++) {
     free((*test_struct).vertices[i]);
   }
   free((*test_struct).vertices);
@@ -84,38 +84,38 @@ uint64_t get_cost(uint64_t pawns, uint64_t mask, uint64_t enpassant,
 
   double **vertices;
   vertices = (double **)malloc(BOARD_SIDE_LENGTH * sizeof(double *));
-  for (unsigned char i = 0; i < BOARD_SIDE_LENGTH; i++) {
+  for (unsigned int i = 0; i < BOARD_SIDE_LENGTH; i++) {
     vertices[i] = calloc(BOARD_SIDE_LENGTH, sizeof(double));
   }
 
   uint64_t curr_position = pawns;
-  char tz = __tzcnt_u64(curr_position);
-  unsigned char v;
+  int tz = __tzcnt_u64(curr_position);
+  unsigned int v;
   for (v = 0; tz != NUM_SQUARES; v++) {
     (*test_struct).tz_sum += tz;
 
-    for (unsigned char i = 0; i < BOARD_SIDE_LENGTH; i++) {
+    for (unsigned int i = 0; i < BOARD_SIDE_LENGTH; i++) {
       vertices[v][i] = INFIN;
     }
 
-    unsigned char col = get_col_num(tz);
+    unsigned int col = get_col_num(tz);
     if (enpassant == (1UL << tz)) {
       assert(!is_kth_bit_set(mask, tz));
 
       vertices[v][col] = 0;
       (*test_struct).enpassant = true;
     } else {
-      unsigned char row = get_row_num(tz);
+      unsigned int row = get_row_num(tz);
 
-      unsigned char left = min(col + row, 7);
+      unsigned int left = min(col + row, 7);
       if (left > (*test_struct).left) {
         (*test_struct).left = left;
       }
-      unsigned char right = max(col - row, 0);
+      unsigned int right = max(col - row, 0);
       if (right < (*test_struct).right) {
         (*test_struct).right = right;
       }
-      for (unsigned char i = right; i <= left; i++) {
+      for (unsigned int i = right; i <= left; i++) {
         vertices[v][i] = abs(col - i);
       }
       if (is_kth_bit_set(mask, tz)) {
@@ -156,13 +156,13 @@ int get_column_mask(uint64_t side0, uint64_t side1,
   uint64_t side1_column = side1 & (COLUMN_1 << col);
 
   // := (63 - 64) == -1 if no side0 pawns on column
-  char highest_side0 = (NUM_SQUARES - 1) - __builtin_clzll(side0_column);
-  char lowest_side1 = __tzcnt_u64(side1_column);
+  int highest_side0 = (NUM_SQUARES - 1) - __builtin_clzll(side0_column);
+  int lowest_side1 = __tzcnt_u64(side1_column);
 
   int num_masks = 0;
   if (highest_side0 > lowest_side1) {
     uint64_t wcc = side0_column;
-    char hwc = highest_side0;
+    int hwc = highest_side0;
     while (hwc > lowest_side1) {
       masks[col][num_masks] = get_mask_for_side1(hwc, side1_column);
       wcc &= ~(1UL << hwc);
@@ -199,22 +199,21 @@ int num_mask_combinations(int num_masks[BOARD_SIDE_LENGTH]) {
   return combinations;
 }
 
-char find_affordable_mask(uint64_t side0, uint64_t side1, uint64_t enpassant,
-                          uint64_t masks[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH],
-                          int num_masks[BOARD_SIDE_LENGTH],
-                          CostStruct max_costs, uint64_t mask,
-                          unsigned char col, int *num_calls) {
+int find_affordable_mask(uint64_t side0, uint64_t side1, uint64_t enpassant,
+                         uint64_t masks[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH],
+                         int num_masks[BOARD_SIDE_LENGTH], CostStruct max_costs,
+                         uint64_t mask, unsigned int col, int *num_calls) {
   assert(col <= BOARD_SIDE_LENGTH && col >= 0);
 
   if (col == BOARD_SIDE_LENGTH) {
-    char side0_cost =
+    int side0_cost =
         get_cost(side0 >> BOARD_SIDE_LENGTH, mask >> BOARD_SIDE_LENGTH,
                  enpassant >> BOARD_SIDE_LENGTH, NULL);
     if (side0_cost > max_costs.side0) {
       return SIDE0_TOO_EXPENSIVE;
     }
 
-    char side1_cost = get_cost(
+    int side1_cost = get_cost(
         rotate_bitboard_across_central_rows(side1) >> BOARD_SIDE_LENGTH,
         rotate_bitboard_across_central_rows(mask) >> BOARD_SIDE_LENGTH,
         rotate_bitboard_across_central_rows(enpassant) >> BOARD_SIDE_LENGTH,
@@ -228,11 +227,11 @@ char find_affordable_mask(uint64_t side0, uint64_t side1, uint64_t enpassant,
 
   bool couldSatisfySide0 = false;
   if (num_masks[col] > 0) {
-    for (unsigned char i = 0; i < num_masks[col]; i++) {
+    for (unsigned int i = 0; i < num_masks[col]; i++) {
       ++(*num_calls);
-      char code = find_affordable_mask(
-          side0, side1, enpassant, masks, num_masks, max_costs,
-          mask + masks[col][i], col + 1, num_calls);
+      int code = find_affordable_mask(side0, side1, enpassant, masks, num_masks,
+                                      max_costs, mask + masks[col][i], col + 1,
+                                      num_calls);
       if (code == SIDE1_TOO_EXPENSIVE) {
         couldSatisfySide0 = true;
       } else if (code == 0) {
@@ -241,8 +240,8 @@ char find_affordable_mask(uint64_t side0, uint64_t side1, uint64_t enpassant,
     }
   } else {
     ++(*num_calls);
-    char code = find_affordable_mask(side0, side1, enpassant, masks, num_masks,
-                                     max_costs, mask, col + 1, num_calls);
+    int code = find_affordable_mask(side0, side1, enpassant, masks, num_masks,
+                                    max_costs, mask, col + 1, num_calls);
     if (code == SIDE1_TOO_EXPENSIVE) {
       couldSatisfySide0 = true;
     } else if (code == 0) {
@@ -261,10 +260,10 @@ char find_affordable_mask(uint64_t side0, uint64_t side1, uint64_t enpassant,
   return SIDE0_TOO_EXPENSIVE;
 }
 
-char validate_cost_helper(position p, CostStruct max_costs) {
+int validate_cost_helper(position p, CostStruct max_costs) {
   uint64_t masks[BOARD_SIDE_LENGTH][BOARD_SIDE_LENGTH] = {0};
   int num_masks[BOARD_SIDE_LENGTH] = {0};
-  for (unsigned char i = 0; i < BOARD_SIDE_LENGTH; i++) {
+  for (unsigned int i = 0; i < BOARD_SIDE_LENGTH; i++) {
     num_masks[i] =
         get_column_mask(p.sides[0].pawns, p.sides[1].pawns, masks, i);
   }
@@ -274,11 +273,11 @@ char validate_cost_helper(position p, CostStruct max_costs) {
                               masks, num_masks, max_costs, 0, 0, &num_calls);
 }
 
-char validate_pawn_cost(position p, char max_cost0, char max_cost1) {
-  char num_capturable_chessmen[NUM_SIDES] = {0};
-  for (unsigned char i = 0; i < NUM_SIDES; i++) {
+int validate_pawn_cost(position p, int max_cost0, int max_cost1) {
+  int num_capturable_chessmen[NUM_SIDES] = {0};
+  for (unsigned int i = 0; i < NUM_SIDES; i++) {
     num_capturable_chessmen[i] += _mm_popcnt_u64(p.sides[i].pawns);
-    for (unsigned char j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
+    for (unsigned int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
       num_capturable_chessmen[i] += _mm_popcnt_u64(p.sides[i].pieces[j]);
     }
   }
