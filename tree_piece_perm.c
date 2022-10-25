@@ -3,7 +3,7 @@
 
 #include "tree_common.h"
 
-char fr_coveredSet_indices[3][3][3][3][3] = {
+int fr_coveredSet_indices[3][3][3][3][3] = {
     {
         {
             {
@@ -164,7 +164,7 @@ char fr_coveredSet_indices[3][3][3][3][3] = {
         },
     },
 };
-char fr_coveredSet_perms[3][14][24][4] = {
+int fr_coveredSet_perms[3][14][24][4] = {
     {
         {
             {0, 2, 1, 3}, {1, 0, 2, 3}, {1, 2, 0, 3},     {2, 0, 1, 3},
@@ -526,7 +526,7 @@ char fr_coveredSet_perms[3][14][24][4] = {
         },
     },
 };
-char fr_coveredSet_perm_cost_boundaries[3][14][4] = {
+int fr_coveredSet_perm_cost_boundaries[3][14][4] = {
     {
         {5, 22, 22, 22},
         {5, 22, 22, 22},

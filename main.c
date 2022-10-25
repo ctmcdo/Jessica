@@ -21,9 +21,9 @@
 #define NUM_THREADS 8
 
 #define ROOK0_BIT 0
-#define ROOK1_BIT ROOK0_BIT + (BOARD_SIDE_LENGTH - 1)
+#define ROOK1_BIT (ROOK0_BIT + (BOARD_SIDE_LENGTH - 1))
 #define ROOK2_BIT (BOARD_SIDE_LENGTH * (BOARD_SIDE_LENGTH - 1))
-#define ROOK3_BIT ROOK2_BIT + (BOARD_SIDE_LENGTH - 1)
+#define ROOK3_BIT (ROOK2_BIT + (BOARD_SIDE_LENGTH - 1))
 #define a_ASCII_decimal 97
 
 // TODO: something related to opposite side to move in check? Take a look at
@@ -60,8 +60,8 @@ position rotate_position_across_central_rows(position p) {
   return rp;
 }
 
-void fen_helper(uint64_t chessmen, char symbol, char squares[NUM_SQUARES]) {
-  char tz = _tzcnt_u64(chessmen);
+void fen_helper(uint64_t chessmen, char symbol, int squares[NUM_SQUARES]) {
+  int tz = _tzcnt_u64(chessmen);
   while (tz != NUM_SQUARES) {
     squares[tz] = symbol;
     chessmen ^= 1UL << tz;
@@ -70,7 +70,7 @@ void fen_helper(uint64_t chessmen, char symbol, char squares[NUM_SQUARES]) {
 }
 
 void print_fen(position p) {
-  char squares[NUM_SQUARES];
+  int squares[NUM_SQUARES];
   for (int i = 0; i < NUM_SQUARES; i++) {
     squares[i] = '1';
   }
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
   printf("Building search space\n");
   position_node *root = malloc(sizeof(position_node));
   build_sample_space(root);
-  gmp_printf("Number of positions in sample space: %.4E\n",
+  gmp_printf("Number of positions in sample space: %.10E\n",
              mpz_get_d(root->num_positions));
   // 7.4733E+45
 

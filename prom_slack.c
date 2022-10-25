@@ -1,9 +1,9 @@
 #include "prom_slack.h"
 #include "chess_constants.h"
 
-slack promotion_slacks(char pawns[NUM_SIDES],
-                       char total_base_capturable_pieces[NUM_SIDES],
-                       char promotions[NUM_SIDES]) {
+slack promotion_slacks(int pawns[NUM_SIDES],
+                       int total_base_capturable_pieces[NUM_SIDES],
+                       int promotions[NUM_SIDES]) {
   slack s;
   for (int i = 0; i < NUM_SIDES; i++) {
     // Naturally, the number of promotions a side has must be less than or equal

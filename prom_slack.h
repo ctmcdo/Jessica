@@ -4,10 +4,10 @@
 
 // The four constraints we adhere to
 typedef struct slack {
-  char pawn_slack[NUM_SIDES];
-  char chessmen_slack[NUM_SIDES];
+  int pawn_slack[NUM_SIDES];
+  int chessmen_slack[NUM_SIDES];
 } slack;
 
-slack promotion_slacks(char pawns[NUM_SIDES],
-                       char total_base_capturable_pieces[NUM_SIDES],
-                       char promotions[NUM_SIDES]);
+slack promotion_slacks(int pawns[NUM_SIDES],
+                       int total_base_capturable_pieces[NUM_SIDES],
+                       int promotions[NUM_SIDES]);

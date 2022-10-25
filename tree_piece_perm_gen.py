@@ -100,7 +100,7 @@ def c_dimensions_str(shape):
 
 
 def format_c_arr_str(a, npname):
-    s = "char "
+    s = "int "
     s += npname
     s += c_dimensions_str(np.shape(a))
     s += " = "
