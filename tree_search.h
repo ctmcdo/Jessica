@@ -14,7 +14,7 @@
 #define EDGE_ROW_MASK                                                          \
   -1 - ((1UL << (7 * BOARD_SIDE_LENGTH)) - 1) + ((1UL << BOARD_SIDE_LENGTH) - 1)
 
-int BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
+int BASE_PIECES[NUM_FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
 
 void gprint(mpz_t i) { gmp_printf("%Zd\n", i); }
 

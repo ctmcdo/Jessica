@@ -2,14 +2,26 @@ import itertools as it
 import math
 import numpy as np
 
-FR_CASES = [[2, 2, 2, 1], [2, 2, 1, 1], [2, 2, 1, 0]]
+# Can have 0, 1, or 2 rooks with castling rights
+FIXED_ROOK_SCENARIOS = 3
+
+# Dimension 0 represents the number of rooks with castling rights.
+# Dimension 1 is the piece type, which varies for 2 fixed rooks because
+# we purposedly keep the array values decreasing
+NUM_NON_FIXED_BASE_PIECES = [[2, 2, 2, 1], [2, 2, 1, 1], [2, 2, 1, 0]]
+############################# b, n, r, q    b, n, r, q    b, n, q, r
+############################################################### <-->
+########################### Notice how we switch queens and rooks ^
 
 # TODO: better comment. Remember that ignore 2s is key to this formula
 # sum_{i=1}^{4}(i + 1) = 14
 NUM_COVERED_SETS = 14
-FIXED_ROOK_SCENARIOS = 3
-NUM_PIECE_TYPES_LESS_KING = 4
+
+# We can only start with at most 2 of any piece type (of the same colour), such as bishops
 MAX_OF_ANY_ONE_BASE_PIECE = 2
+
+# |{b, n, r, q}| == 4
+NUM_PIECE_TYPES_LESS_KING = 4
 
 # (2, 2, 1, 0) gives rise to permutation with greatest cost: (1, 0, 2, 2)
 # which is base cost + 3. There are also base + 1, base + 2, ... so 4 in total
@@ -42,7 +54,7 @@ fr_coveredSet_perm_cost_boundaries = np.negative(
 
 
 def covered_sets(fr_case_num):
-    b = FR_CASES[fr_case_num]
+    b = NUM_NON_FIXED_BASE_PIECES[fr_case_num]
     s = b.copy()
 
     cset_num = 0
@@ -114,7 +126,7 @@ for i in range(FIXED_ROOK_SCENARIOS):
         cost_to_perms = {}
         for p in it.permutations((0, 1, 2, 3)):
             permuted_set = [s[pe] for pe in p]
-            c = cost(permuted_set, FR_CASES[i])
+            c = cost(permuted_set, NUM_NON_FIXED_BASE_PIECES[i])
             if c not in cost_to_perms:
                 cost_to_perms[c] = []
             else:
