@@ -158,11 +158,11 @@ void count_from_pieces_helper(
     if ((side == 1 && i == 0) || rel_level == (2 * (NUM_PIECE_TYPES)-1)) {
       int *cost_boundary_indices[NUM_SIDES];
       for (int j = 0; j < NUM_SIDES; j++) {
-        int csj = fr_coveredSet_indices[fixed_rooks[j]][covered_sets[j][0]]
+        int csj = fr_coveredSet_index[fixed_rooks[j]][covered_sets[j][0]]
                                        [covered_sets[j][1]][covered_sets[j][2]]
                                        [covered_sets[j][3]];
         cost_boundary_indices[j] =
-            fr_coveredSet_perm_cost_boundaries[fixed_rooks[j]][csj];
+            fr_coveredSetIndex_permAddnCost_numPerms[fixed_rooks[j]][csj];
       }
       slack prom_slacks = promotion_slacks(
           pawns, new_total_base_capturable_pieces, new_promotions);

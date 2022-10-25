@@ -16,12 +16,12 @@
 #define ONE_FIXED_ROOK_VARIATIONS 2
 
 extern int
-    fr_coveredSet_indices[NUM_FIXED_ROOK_SCENARIOS][MAX_OF_ANY_BASE_PIECE + 1]
+    fr_coveredSet_index[NUM_FIXED_ROOK_SCENARIOS][MAX_OF_ANY_BASE_PIECE + 1]
                          [MAX_OF_ANY_BASE_PIECE + 1][MAX_OF_ANY_BASE_PIECE + 1]
                          [MAX_OF_ANY_BASE_PIECE + 1];
-extern int fr_coveredSet_perms[NUM_FIXED_ROOK_SCENARIOS][NUM_COVERED_SETS]
+extern int fr_coveredSetIndex_permIndex_perm[NUM_FIXED_ROOK_SCENARIOS][NUM_COVERED_SETS]
                               [FOUR_FACTORIAL][NUM_PIECE_TYPES_LESS_KING];
-extern int fr_coveredSet_perm_cost_boundaries[NUM_FIXED_ROOK_SCENARIOS]
+extern int fr_coveredSetIndex_permAddnCost_numPerms[NUM_FIXED_ROOK_SCENARIOS]
                                              [NUM_COVERED_SETS]
                                              [MAX_UNIQUE_COSTS];
 
