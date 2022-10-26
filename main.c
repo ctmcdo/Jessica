@@ -156,7 +156,7 @@ int main(int argc, char **argv) {
   build_sample_space(root);
   gmp_printf("Number of positions in sample space: %.10E\n",
              mpz_get_d(root->num_positions));
-  // 7.4733E+45
+  // 1.2563633941E+47
 
   gmp_randstate_t s;
   gmp_randinit_mt(s);
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
     mpz_urandomm(rng, s, root->num_positions);
     position p = retrieve_position(root, rng);
 
-    // sanity_check_position(p);
+    sanity_check_position(p);
 
     checking_info ci = validate_checks(p);
     char check_code = ci.code;
@@ -196,6 +196,7 @@ int main(int argc, char **argv) {
       continue;
     }
 
+    /*
     // now we assume every piece we take is not a pawn
     int pawn_cost_code = validate_pawn_cost(p, bs.slack[0], bs.slack[1]);
     if (pawn_cost_code != 0) {
@@ -208,6 +209,7 @@ int main(int argc, char **argv) {
       // print_fen(p);
       continue;
     }
+    */
 
     successes++;
   }
@@ -240,7 +242,7 @@ int main(int argc, char **argv) {
   mpf_mul(pbound, pbound, p_hat);
 
   gmp_printf("Probabilistic upperbound on the number of positions in chess is "
-             "%.2FE\n +- %.2FE\n",
+             "%.2FE +- %.2FE\n",
              pbound, standard_err);
 
   return 0;
