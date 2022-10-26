@@ -27,7 +27,7 @@
 
 // Can have 0, 1, or 2 rooks with castling rights
 // |{0, 1, 2}| = 3
-int BASE_PIECES[FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING] = {
+int BASE_PIECES[NUM_FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING] = {
     {2, 2, 2, 1}, {2, 2, 1, 1}, {2, 2, 1, 0}};
 //// b, n, r, q    b, n, r, q    b, n, q, r
 ////////////////////////////////////// <-->
@@ -158,11 +158,11 @@ void count_from_pieces_helper(
     if ((side == 1 && i == 0) || rel_level == (2 * (NUM_PIECE_TYPES)-1)) {
       int *cost_boundary_indices[NUM_SIDES];
       for (int j = 0; j < NUM_SIDES; j++) {
-        int csj = fr_coveredSet_indices[fixed_rooks[j]][covered_sets[j][0]]
+        int csj = fr_coveredSet_index[fixed_rooks[j]][covered_sets[j][0]]
                                        [covered_sets[j][1]][covered_sets[j][2]]
                                        [covered_sets[j][3]];
         cost_boundary_indices[j] =
-            fr_coveredSet_perm_cost_boundaries[fixed_rooks[j]][csj];
+            fr_coveredSetIndex_permAddnCost_numPerms[fixed_rooks[j]][csj];
       }
       slack prom_slacks = promotion_slacks(
           pawns, new_total_base_capturable_pieces, new_promotions);
@@ -244,7 +244,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
 
   typedef void *(*fn)(void *);
   fn next_call = count_from_fixed_rooks_and_kings;
-  int num_children = FIXED_ROOK_SCENARIOS; // 3
+  int num_children = NUM_FIXED_ROOK_SCENARIOS; // 3
   if (ts.side) {
     next_call = count_from_pieces;
     if (!ts.enpassant) {
@@ -259,7 +259,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
     ts.root->children[i] = (position_node *)malloc(sizeof(position_node));
   }
 
-  threading_struct tstructs_out[FIXED_ROOK_SCENARIOS] = {0};
+  threading_struct tstructs_out[NUM_FIXED_ROOK_SCENARIOS] = {0};
   for (int i = 0; i < num_children; i++) {
     tstructs_out[i].root = ts.root->children[i];
     tstructs_out[i].free_pawns[0] = ts.free_pawns[0];
@@ -270,7 +270,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
     tstructs_out[i].side = 1;
   }
 
-  pthread_t thread_ids[FIXED_ROOK_SCENARIOS];
+  pthread_t thread_ids[NUM_FIXED_ROOK_SCENARIOS];
   // CASE 1: no castling rights
   tstructs_out[NO_CASTLING_RIGHTS].num_occupiable_squares =
       ts.num_occupiable_squares;
