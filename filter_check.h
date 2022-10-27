@@ -436,11 +436,10 @@ checking_info validate_checks_side1(position p) {
     return ci;
   }
 
-  /*
   int aspect_diff = 0;
   int aspect_total = 0;
   for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
-    if (sliding_attacks[i].aspect != MOORE_NEIGHBOURHOOD_SIZE) {
+    if (sliding_attacks_by_piece_type[i].aspect != MOORE_NEIGHBOURHOOD_SIZE) {
       if (aspect_diff < 0) {
         aspect_diff += sliding_attacks_by_piece_type[i].aspect;
       } else {
@@ -455,7 +454,7 @@ checking_info validate_checks_side1(position p) {
     ci.code = OBTUSE_ASPECTS;
     return ci;
   }
-  */
+
   return ci;
 }
 

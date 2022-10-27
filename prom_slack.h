@@ -1,5 +1,4 @@
 #pragma once
-
 #include "chess_constants.h"
 
 // The four constraints we adhere to

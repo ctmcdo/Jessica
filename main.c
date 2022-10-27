@@ -26,6 +26,8 @@
 #define ROOK3_BIT (ROOK2_BIT + (BOARD_SIDE_LENGTH - 1))
 #define a_ASCII_decimal 97
 
+#define TEN_THOUSAND 10000
+
 // TODO: something related to opposite side to move in check? Take a look at
 // previous archive
 
@@ -99,7 +101,7 @@ void print_fen(position p) {
   }
 
   printf(" ");
-  if (p.side0isBlack) {
+  if (p.side0isBlack != p.side1toMove) {
     printf("w ");
   } else {
     printf("b ");
@@ -110,10 +112,9 @@ void print_fen(position p) {
   bool cr2 = p.sides[1].fixed_rooks & (1UL << ROOK2_BIT);
   bool cr3 = p.sides[1].fixed_rooks & (1UL << ROOK3_BIT);
   if (!cr0 && !cr1 && !cr2 && !cr3) {
-    printf("- ");
+    printf("-");
 
   } else {
-
     if (cr0) {
       printf("K");
     }
@@ -126,8 +127,8 @@ void print_fen(position p) {
     if (cr3) {
       printf("q");
     }
-    printf(" ");
   }
+  printf(" ");
 
   if (p.enpassant) {
     char ep = get_index_of_1st_set_bit(p.enpassant);
@@ -164,13 +165,20 @@ int main(int argc, char **argv) {
   mpz_init(rng);
 
   uint64_t successes = 0;
-  long sample_size = strtol(argv[1], NULL, 10);
+  long sample_size;
+  if (argc > 1) {
+    sample_size = strtol(argv[1], NULL, 10);
+  } else {
+    sample_size = TEN_THOUSAND;
+    printf("Using default sample size of ten thousand\n");
+  }
   for (int i = 0; i < sample_size; i++) {
     mpz_urandomm(rng, s, root->num_positions);
     position p = retrieve_position(root, rng);
 
     sanity_check_position(p);
 
+    /*
     checking_info ci = validate_checks(p);
     char check_code = ci.code;
     if (check_code != 0) {
@@ -196,7 +204,6 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    /*
     // now we assume every piece we take is not a pawn
     int pawn_cost_code = validate_pawn_cost(p, bs.slack[0], bs.slack[1]);
     if (pawn_cost_code != 0) {
@@ -212,6 +219,12 @@ int main(int argc, char **argv) {
     */
 
     successes++;
+
+    p.side0isBlack = i % NUM_SIDES == 1;
+    if (p.side0isBlack) {
+      p = rotate_position_across_central_rows(p);
+    }
+    print_fen(p);
   }
 
   mpf_t p_hat;
@@ -219,9 +232,9 @@ int main(int argc, char **argv) {
   mpf_set_ui(p_hat, successes);
   mpf_div_ui(p_hat, p_hat, sample_size);
 
-  mpf_t z95;
-  mpf_init(z95);
-  mpf_set_d(z95, 1.96);
+  mpf_t z995;
+  mpf_init(z995);
+  mpf_set_d(z995, 2.807);
 
   mpf_t standard_err;
   mpf_init(standard_err);
@@ -230,7 +243,7 @@ int main(int argc, char **argv) {
   mpf_mul(standard_err, standard_err, p_hat);
   mpf_div_ui(standard_err, standard_err, sample_size);
   mpf_sqrt(standard_err, standard_err);
-  mpf_mul(standard_err, standard_err, z95);
+  mpf_mul(standard_err, standard_err, z995);
   mpf_t sample_space_size;
   mpf_init(sample_space_size);
   mpf_set_z(sample_space_size, root->num_positions);
@@ -241,7 +254,8 @@ int main(int argc, char **argv) {
   mpf_set(pbound, sample_space_size);
   mpf_mul(pbound, pbound, p_hat);
 
-  gmp_printf("Probabilistic upperbound on the number of positions in chess is "
+  gmp_printf("Probabilistic upperbound (using confidence interval of 99.5%) on "
+             "the number of positions in chess is "
              "%.2FE +- %.2FE\n",
              pbound, standard_err);
 
