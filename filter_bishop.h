@@ -13,8 +13,8 @@ typedef struct {
 
 bishop_slack bishop_promotion_slacks(position p) {
   int num_pawns[NUM_SIDES];
-  int promotions[NUM_SIDES] = {0};
   int num_base;
+  int promotions[NUM_SIDES] = {0};
   int total_base_capturable_pieces[NUM_SIDES] = {0};
   for (int i = 0; i < NUM_SIDES; i++) {
     num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
@@ -28,7 +28,7 @@ bishop_slack bishop_promotion_slacks(position p) {
       total_base_capturable_pieces[i] += num_base;
     }
     int num_white_sq_bishops =
-        _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & BLACK_SQ_MASK);
+        _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & WHITE_SQ_MASK);
     int num_black_sq_bishops =
         _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & BLACK_SQ_MASK);
     if (num_black_sq_bishops == 0 || num_white_sq_bishops == 0) {

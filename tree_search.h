@@ -16,8 +16,6 @@
 
 int BASE_PIECES[NUM_FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
 
-void gprint(mpz_t i) { gmp_printf("%Zd\n", i); }
-
 typedef struct {
   int indices[NUM_SIDES];
 } permutation_indices;
@@ -309,11 +307,11 @@ position retrieve_position(position_node *root, mpz_t index) {
   for (int i = 0; i < NUM_SIDES; i++) {
     coveredSet_indices[i] =
         fr_coveredSet_index[num_fixed_rooks[i]][covered_sets[i][0]]
-                             [covered_sets[i][1]][covered_sets[i][2]]
-                             [covered_sets[i][3]];
+                           [covered_sets[i][1]][covered_sets[i][2]]
+                           [covered_sets[i][3]];
     cost_boundary_indices[i] =
         fr_coveredSetIndex_permAddnCost_numPerms[num_fixed_rooks[i]]
-                                          [coveredSet_indices[i]];
+                                                [coveredSet_indices[i]];
   }
   slack prom_slacks =
       promotion_slacks(num_pawns, total_base_capturable_pieces, promotions);
@@ -324,7 +322,8 @@ position retrieve_position(position_node *root, mpz_t index) {
 
   int *permutations[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
-    permutations[i] = fr_coveredSetIndex_permIndex_perm[num_fixed_rooks[i]]
+    permutations[i] =
+        fr_coveredSetIndex_permIndex_perm[num_fixed_rooks[i]]
                                          [coveredSet_indices[i]][pi.indices[i]];
   }
   assert(permutations[0][0] != -1);
