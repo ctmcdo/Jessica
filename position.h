@@ -19,5 +19,5 @@ typedef struct position {
   side sides[NUM_SIDES];
   uint64_t enpassant;
   bool side0isBlack;
-  bool side1toMove;
+  bool side0toMove;
 } position;

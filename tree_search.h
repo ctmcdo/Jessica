@@ -11,6 +11,9 @@
 #include "tree_common.h"
 #include "util.h"
 
+// TODO: are the fixed rook cases balanced between white and black?
+// -> they don't seem to be
+
 #define EDGE_ROW_MASK                                                          \
   -1 - ((1UL << (7 * BOARD_SIDE_LENGTH)) - 1) + ((1UL << BOARD_SIDE_LENGTH) - 1)
 
@@ -241,7 +244,7 @@ position retrieve_position(position_node *root, mpz_t index) {
   if (!p.enpassant && !equal_num_pawns) {
     mpz_fdiv_qr_ui(index, rem, index, 2);
     if (mpz_get_ui(rem)) {
-      p.side1toMove = true;
+      p.side0toMove = true;
     }
   }
   occupied_squares -= EDGE_ROW_MASK;
@@ -251,11 +254,10 @@ position retrieve_position(position_node *root, mpz_t index) {
   num_fixed_rooks[0] = _mm_popcnt_u64(p.sides[0].fixed_rooks);
   num_fixed_rooks[1] = _mm_popcnt_u64(p.sides[1].fixed_rooks);
   if (!p.enpassant && equal_num_pawns &&
-      (_mm_popcnt_u64(p.sides[0].fixed_rooks) !=
-       _mm_popcnt_u64(p.sides[1].fixed_rooks))) {
+      num_fixed_rooks[0] != num_fixed_rooks[1]) {
     mpz_fdiv_qr_ui(index, rem, index, 2);
     if (mpz_get_ui(rem)) {
-      p.side1toMove = true;
+      p.side0toMove = true;
     }
   }
 

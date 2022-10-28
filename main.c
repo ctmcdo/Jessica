@@ -44,6 +44,17 @@
 
 // void *filter_samples(void *) {}
 
+long wcount = 0;
+long bcount = 0;
+long side0toMoveCount = 0;
+long side1toMoveCount = 0;
+long kcount = 0;
+long Kcount = 0;
+long qcount = 0;
+long Qcount = 0;
+long pawnswcount = 0;
+long pawnsbcount = 0;
+
 position rotate_position_across_central_rows(position p) {
   position rp;
   rp.side0isBlack = p.side0isBlack;
@@ -99,13 +110,13 @@ void print_fen(position p) {
       printf("/");
     }
   }
-
   printf(" ");
-  if (p.side0isBlack != p.side1toMove) {
-    printf("w ");
-  } else {
-    printf("b ");
+
+  char colour = 'w';
+  if (p.side0isBlack) {
+    colour = 'b';
   }
+  printf("%c ", colour);
 
   bool cr0 = p.sides[0].fixed_rooks & (1UL << ROOK0_BIT);
   bool cr1 = p.sides[0].fixed_rooks & (1UL << ROOK1_BIT);
@@ -117,15 +128,19 @@ void print_fen(position p) {
   } else {
     if (cr0) {
       printf("K");
+      Kcount += 1;
     }
     if (cr1) {
       printf("Q");
+      Qcount += 1;
     }
     if (cr2) {
       printf("k");
+      kcount += 1;
     }
     if (cr3) {
       printf("q");
+      qcount += 1;
     }
   }
   printf(" ");
@@ -220,9 +235,26 @@ int main(int argc, char **argv) {
 
     successes++;
 
+    if (p.side0isBlack) {
+      bcount += 1;
+    } else {
+      wcount += 1;
+    }
+
+    if (p.side0toMove) {
+      side0toMoveCount += 1;
+    } else {
+      side1toMoveCount += 1;
+    }
+
     p.side0isBlack = i % NUM_SIDES == 1;
     if (p.side0isBlack) {
       p = rotate_position_across_central_rows(p);
+      pawnsbcount += _mm_popcnt_u64(p.sides[0].pawns);
+      pawnswcount += _mm_popcnt_u64(p.sides[1].pawns);
+    } else {
+      pawnswcount += _mm_popcnt_u64(p.sides[0].pawns);
+      pawnsbcount += _mm_popcnt_u64(p.sides[1].pawns);
     }
     print_fen(p);
   }
@@ -258,6 +290,19 @@ int main(int argc, char **argv) {
              "the number of positions in chess is "
              "%.2FE +- %.2FE\n",
              pbound, standard_err);
+
+  printf("bcount: %ld\n", bcount);
+  printf("wcount: %ld\n", bcount);
+  printf("side0toMoveCount: %ld\n", side0toMoveCount);
+  printf("side1toMoveCount: %ld\n", side1toMoveCount);
+
+  printf("kcount: %ld\n", kcount);
+  printf("Kcount: %ld\n", Kcount);
+  printf("qcount: %ld\n", qcount);
+  printf("Qcount: %ld\n", Qcount);
+
+  printf("pawnswcount: %ld\n", pawnswcount);
+  printf("pawnsbcount: %ld\n", pawnsbcount);
 
   return 0;
 }
