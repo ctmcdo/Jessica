@@ -133,32 +133,37 @@ int pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
   mpz_init(rem);
   uint64_t remui;
 
-  uint64_t king = 0;
   uint64_t fixed_rooks = 0;
-
   int num_fixed_rooks = point_root_to_matching_child(root, index);
-  if (num_fixed_rooks > 0) {
-    king = rcb(0, KING_HOME_COLUMN_0INDEX);
-  }
+  switch (num_fixed_rooks) {
+  case NO_CASTLING_RIGHTS:
+    break;
 
-  if (num_fixed_rooks == CASTLING_RIGHTS_ONE_SIDE) {
+  case CASTLING_RIGHTS_ONE_SIDE:
     mpz_fdiv_qr_ui(index, rem, index, ONE_FIXED_ROOK_VARIATIONS);
     remui = mpz_get_ui(rem);
     fixed_rooks = 1UL << ((BOARD_SIDE_LENGTH - 1) * remui);
+    break;
 
-  } else if (num_fixed_rooks == CASTLING_RIGHTS_BOTH_SIDES) {
+  case CASTLING_RIGHTS_BOTH_SIDES:
     fixed_rooks = 1 + (1UL << (BOARD_SIDE_LENGTH - 1));
+    break;
 
-  } else if (num_fixed_rooks != NO_CASTLING_RIGHTS) {
+  default:
     exit(1);
   }
 
-  if (num_fixed_rooks > 0 && side == 1) {
-    king = rotate_bitboard_across_central_rows(king);
-    fixed_rooks = rotate_bitboard_across_central_rows(fixed_rooks);
+  uint64_t king = 0;
+  if (num_fixed_rooks > 0) {
+    king = rcb(0, KING_HOME_COLUMN_0INDEX);
+    if (side) {
+      fixed_rooks = rotate_bitboard_across_central_rows(fixed_rooks);
+      king = rotate_bitboard_across_central_rows(king);
+    }
   }
 
-  p->sides[side].fixed_rooks = fixed_rooks;
+  p->sides[side]._fr = fixed_rooks;
+  p->fixed_rooks += fixed_rooks;
   p->sides[side].pieces[KING] = king;
   *occupied_squares += fixed_rooks + king;
 
@@ -248,13 +253,10 @@ position retrieve_position(position_node *root, mpz_t index) {
     }
   }
   occupied_squares -= EDGE_ROW_MASK;
-  pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 0);
-  pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 1);
-  int num_fixed_rooks[NUM_SIDES];
-  num_fixed_rooks[0] = _mm_popcnt_u64(p.sides[0].fixed_rooks);
-  num_fixed_rooks[1] = _mm_popcnt_u64(p.sides[1].fixed_rooks);
-  if (!p.enpassant && equal_num_pawns &&
-      num_fixed_rooks[0] != num_fixed_rooks[1]) {
+  int nfr[NUM_SIDES];
+  nfr[0] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 1);
+  nfr[1] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 0);
+  if (!p.enpassant && equal_num_pawns && (nfr[0] != nfr[1])) {
     mpz_fdiv_qr_ui(index, rem, index, 2);
     if (mpz_get_ui(rem)) {
       p.side0toMove = true;
@@ -269,9 +271,9 @@ position retrieve_position(position_node *root, mpz_t index) {
       num_chessmen =
           pass_generic(&root, index, &occupied_squares, &p.sides[i].pieces[j]);
       covered_sets[i][j] = num_chessmen;
-      int d = num_chessmen - BASE_PIECES[num_fixed_rooks[i]][j];
+      int d = num_chessmen - BASE_PIECES[nfr[i]][j];
       if (d > 0) {
-        covered_sets[i][j] = BASE_PIECES[num_fixed_rooks[i]][j];
+        covered_sets[i][j] = BASE_PIECES[nfr[i]][j];
         promotions[i] += d;
       }
       if (num_chessmen == 0) {
@@ -285,14 +287,14 @@ position retrieve_position(position_node *root, mpz_t index) {
   for (int i = 0; i < NUM_SIDES; i++) {
     num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
 
-    total_base_capturable_pieces[i] = num_fixed_rooks[i];
+    total_base_capturable_pieces[i] = nfr[i];
     for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
       total_base_capturable_pieces[i] += covered_sets[i][j];
     }
   }
 
   for (int i = 0; i < NUM_SIDES; i++) {
-    if (num_fixed_rooks[i] == NO_CASTLING_RIGHTS) {
+    if (nfr[i] == NO_CASTLING_RIGHTS) {
       int num_free_squares = NUM_SQUARES - _mm_popcnt_u64(occupied_squares);
       mpz_fdiv_qr_ui(index, rem, index, num_free_squares);
       p.sides[i].pieces[KING] =
@@ -308,12 +310,10 @@ position retrieve_position(position_node *root, mpz_t index) {
   int *cost_boundary_indices[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     coveredSet_indices[i] =
-        fr_coveredSet_index[num_fixed_rooks[i]][covered_sets[i][0]]
-                           [covered_sets[i][1]][covered_sets[i][2]]
-                           [covered_sets[i][3]];
+        fr_coveredSet_index[nfr[i]][covered_sets[i][0]][covered_sets[i][1]]
+                           [covered_sets[i][2]][covered_sets[i][3]];
     cost_boundary_indices[i] =
-        fr_coveredSetIndex_permAddnCost_numPerms[num_fixed_rooks[i]]
-                                                [coveredSet_indices[i]];
+        fr_coveredSetIndex_permAddnCost_numPerms[nfr[i]][coveredSet_indices[i]];
   }
   slack prom_slacks =
       promotion_slacks(num_pawns, total_base_capturable_pieces, promotions);
@@ -325,8 +325,8 @@ position retrieve_position(position_node *root, mpz_t index) {
   int *permutations[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     permutations[i] =
-        fr_coveredSetIndex_permIndex_perm[num_fixed_rooks[i]]
-                                         [coveredSet_indices[i]][pi.indices[i]];
+        fr_coveredSetIndex_permIndex_perm[nfr[i]][coveredSet_indices[i]]
+                                         [pi.indices[i]];
   }
   assert(permutations[0][0] != -1);
   assert(permutations[1][0] != -1);
@@ -345,15 +345,15 @@ position retrieve_position(position_node *root, mpz_t index) {
   }
 
   for (int i = 0; i < NUM_SIDES; i++) {
-    if (num_fixed_rooks[i] == CASTLING_RIGHTS_BOTH_SIDES) {
+    if (nfr[i] == CASTLING_RIGHTS_BOTH_SIDES) {
       uint64_t swp = p.sides[i].pieces[ROOK];
       p.sides[i].pieces[ROOK] = p.sides[i].pieces[QUEEN];
       p.sides[i].pieces[QUEEN] = swp;
     }
   }
 
-  p.sides[0].pieces[ROOK] += p.sides[0].fixed_rooks;
-  p.sides[1].pieces[ROOK] += p.sides[1].fixed_rooks;
+  p.sides[0].pieces[ROOK] += p.sides[0]._fr;
+  p.sides[1].pieces[ROOK] += p.sides[1]._fr;
 
   return p;
 }

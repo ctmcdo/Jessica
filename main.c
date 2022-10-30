@@ -21,12 +21,14 @@
 #define NUM_THREADS 8
 
 #define ROOK0_BIT 0
-#define ROOK1_BIT (ROOK0_BIT + (BOARD_SIDE_LENGTH - 1))
+#define ROOK1_BIT (BOARD_SIDE_LENGTH - 1)
 #define ROOK2_BIT (BOARD_SIDE_LENGTH * (BOARD_SIDE_LENGTH - 1))
 #define ROOK3_BIT (ROOK2_BIT + (BOARD_SIDE_LENGTH - 1))
 #define a_ASCII_decimal 97
 
 #define TEN_THOUSAND 10000
+
+// TODO: assertions galore
 
 // TODO: something related to opposite side to move in check? Take a look at
 // previous archive
@@ -36,6 +38,8 @@
 
 // TODO: rename sample tree to sample space
 
+// TODO: print probability distrubtions for chessmen
+
 // typedef struct {
 //  rgns[];
 //  sample_size;
@@ -44,25 +48,14 @@
 
 // void *filter_samples(void *) {}
 
-long wcount = 0;
-long bcount = 0;
-long side0toMoveCount = 0;
-long side1toMoveCount = 0;
-long kcount = 0;
-long Kcount = 0;
-long qcount = 0;
-long Qcount = 0;
-long pawnswcount = 0;
-long pawnsbcount = 0;
-
 position rotate_position_across_central_rows(position p) {
   position rp;
   rp.side0isBlack = p.side0isBlack;
+  rp.side0toMove = p.side0toMove;
   rp.enpassant = rotate_bitboard_across_central_rows(p.enpassant);
-  for (int i = 0; i < NUM_SIDES; i++) {
-    rp.sides[i].fixed_rooks =
-        rotate_bitboard_across_central_rows(p.sides[i].fixed_rooks);
+  rp.fixed_rooks = rotate_bitboard_across_central_rows(p.fixed_rooks);
 
+  for (int i = 0; i < NUM_SIDES; i++) {
     rp.sides[i].pawns = rotate_bitboard_across_central_rows(p.sides[i].pawns);
 
     for (int j = 0; j < NUM_PIECE_TYPES; j++) {
@@ -118,29 +111,24 @@ void print_fen(position p) {
   }
   printf("%c ", colour);
 
-  bool cr0 = p.sides[0].fixed_rooks & (1UL << ROOK0_BIT);
-  bool cr1 = p.sides[0].fixed_rooks & (1UL << ROOK1_BIT);
-  bool cr2 = p.sides[1].fixed_rooks & (1UL << ROOK2_BIT);
-  bool cr3 = p.sides[1].fixed_rooks & (1UL << ROOK3_BIT);
+  bool cr0 = p.fixed_rooks & (1UL << ROOK0_BIT);
+  bool cr1 = p.fixed_rooks & (1UL << ROOK1_BIT);
+  bool cr2 = p.fixed_rooks & (1UL << ROOK2_BIT);
+  bool cr3 = p.fixed_rooks & (1UL << ROOK3_BIT);
   if (!cr0 && !cr1 && !cr2 && !cr3) {
     printf("-");
-
   } else {
     if (cr0) {
       printf("K");
-      Kcount += 1;
     }
     if (cr1) {
       printf("Q");
-      Qcount += 1;
     }
     if (cr2) {
       printf("k");
-      kcount += 1;
     }
     if (cr3) {
       printf("q");
-      qcount += 1;
     }
   }
   printf(" ");
@@ -172,7 +160,7 @@ int main(int argc, char **argv) {
   build_sample_space(root);
   gmp_printf("Number of positions in sample space: %.10E\n",
              mpz_get_d(root->num_positions));
-  // 1.2563633941E+47
+  // 1.2572648194E+47
 
   gmp_randstate_t s;
   gmp_randinit_mt(s);
@@ -236,25 +224,7 @@ int main(int argc, char **argv) {
     successes++;
 
     if (p.side0isBlack) {
-      bcount += 1;
-    } else {
-      wcount += 1;
-    }
-
-    if (p.side0toMove) {
-      side0toMoveCount += 1;
-    } else {
-      side1toMoveCount += 1;
-    }
-
-    p.side0isBlack = i % NUM_SIDES == 1;
-    if (p.side0isBlack) {
       p = rotate_position_across_central_rows(p);
-      pawnsbcount += _mm_popcnt_u64(p.sides[0].pawns);
-      pawnswcount += _mm_popcnt_u64(p.sides[1].pawns);
-    } else {
-      pawnswcount += _mm_popcnt_u64(p.sides[0].pawns);
-      pawnsbcount += _mm_popcnt_u64(p.sides[1].pawns);
     }
     print_fen(p);
   }
@@ -290,19 +260,6 @@ int main(int argc, char **argv) {
              "the number of positions in chess is "
              "%.2FE +- %.2FE\n",
              pbound, standard_err);
-
-  printf("bcount: %ld\n", bcount);
-  printf("wcount: %ld\n", bcount);
-  printf("side0toMoveCount: %ld\n", side0toMoveCount);
-  printf("side1toMoveCount: %ld\n", side1toMoveCount);
-
-  printf("kcount: %ld\n", kcount);
-  printf("Kcount: %ld\n", Kcount);
-  printf("qcount: %ld\n", qcount);
-  printf("Qcount: %ld\n", Qcount);
-
-  printf("pawnswcount: %ld\n", pawnswcount);
-  printf("pawnsbcount: %ld\n", pawnsbcount);
 
   return 0;
 }
