@@ -90,12 +90,16 @@ void count_from_pieces_helper(
 
   slack prom_slacks =
       promotion_slacks(pawns, total_base_capturable_pieces, promotions);
+  int piece_lim2 = prom_slacks.chessmen_slack[side];
+  int max_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
+  if (piece_lim2 > max_base_pieces) {
+    piece_lim2 = max_base_pieces + (int)((piece_lim2 - max_base_pieces) / 2);
+  }
   // We ensure there are sufficient captured pieces and pawns to cover the
   // opposition's promotions. This only applies to side1 ensuring side0's
   // promotions are valid because side0 is computed assuming side1 has nothing
   // but a king on the board
   int piece_lim3 = prom_slacks.chessmen_slack[!side];
-  int max_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
   // Pieces are assumed to be base pieces up to max_base_pieces. Otherwise by
   // considering a piece promoted where it could be base we would be decreasing
   // the number of pieces the side with the piece-in-question can have by 1 and
@@ -103,9 +107,8 @@ void count_from_pieces_helper(
   if (piece_lim3 > max_base_pieces) {
     piece_lim3 = max_base_pieces + (int)((piece_lim3 - max_base_pieces) / 2);
   }
-  int max_pieces =
-      min3(max_base_pieces + prom_slacks.pawn_slack[side],
-           max_base_pieces + prom_slacks.chessmen_slack[side], piece_lim3);
+  int max_pieces = min3(max_base_pieces + prom_slacks.pawn_slack[side],
+                        piece_lim2, piece_lim3);
   assert(0 <= max_pieces && max_pieces <= 10);
 
   // We can always have none of a piece, so there are 1 + max_pieces cases.
@@ -159,8 +162,8 @@ void count_from_pieces_helper(
       int *cost_boundary_indices[NUM_SIDES];
       for (int j = 0; j < NUM_SIDES; j++) {
         int csj = fr_coveredSet_index[fixed_rooks[j]][covered_sets[j][0]]
-                                       [covered_sets[j][1]][covered_sets[j][2]]
-                                       [covered_sets[j][3]];
+                                     [covered_sets[j][1]][covered_sets[j][2]]
+                                     [covered_sets[j][3]];
         cost_boundary_indices[j] =
             fr_coveredSetIndex_permAddnCost_numPerms[fixed_rooks[j]][csj];
       }
@@ -247,7 +250,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
   int num_children = NUM_FIXED_ROOK_SCENARIOS; // 3
   if (ts.side) {
     next_call = count_from_pieces;
-    if (!ts.enpassant) {
+    if (!ts.enpassant && (ts.free_pawns[0] == ts.free_pawns[1])) {
       num_children = ts.fixed_rooks[0] + 1;
     }
   }
@@ -309,7 +312,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
   // side1.
 
   // Account for symmetry avoiding fr[0] == fr[1]
-  if (ts.side && !ts.enpassant && ts.free_pawns[0] == ts.free_pawns[1]) {
+  if (ts.side && !ts.enpassant && (ts.free_pawns[0] == ts.free_pawns[1])) {
     for (int i = 0; i < num_children - 1; i++) {
       mpz_mul_ui(ts.root->children[i]->num_positions,
                  ts.root->children[i]->num_positions, 2);

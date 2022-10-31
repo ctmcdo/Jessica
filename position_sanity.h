@@ -62,17 +62,19 @@ void sanity_check_position(position p) {
 
   // rooks with castling rights
   // and kings at home
-  if (0 < p.sides[0].fixed_rooks) {
-    uint64_t fixed_rooks_mask_compliment = ~(rcb(0, 0) + rcb(0, 7));
-    assert(0 == (p.sides[0].fixed_rooks & fixed_rooks_mask_compliment));
+  if (0 < p.sides[0]._fr) {
+    uint64_t fixed_rooks_mask = rcb(0, 0) + rcb(0, 7);
+    assert(0 == (p.sides[0]._fr & (~fixed_rooks_mask)));
     assert(0 != (p.sides[0].pieces[4] & rcb(0, 3)));
+    assert(0 != (p.sides[0].pieces[2] & fixed_rooks_mask));
     // is accounted for by rooks
-    assert(p.sides[0].fixed_rooks & p.sides[0].pieces[2]);
+    assert(p.sides[0]._fr & p.sides[0].pieces[2]);
   }
-  if (0 < p.sides[1].fixed_rooks) {
-    uint64_t fixed_rooks_mask_compliment = ~(rcb(7, 0) + rcb(7, 7));
-    assert(0 == (p.sides[1].fixed_rooks & fixed_rooks_mask_compliment));
+  if (0 < p.sides[1]._fr) {
+    uint64_t fixed_rooks_mask = rcb(7, 0) + rcb(7, 7);
+    assert(0 == (p.sides[1]._fr & (~fixed_rooks_mask)));
     assert(0 != (p.sides[1].pieces[4] & rcb(7, 3)));
-    assert(p.sides[1].fixed_rooks & p.sides[1].pieces[2]);
+    assert(0 != (p.sides[1].pieces[2] & fixed_rooks_mask));
+    assert(p.sides[1]._fr & p.sides[1].pieces[2]);
   }
 }

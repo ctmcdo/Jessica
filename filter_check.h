@@ -412,10 +412,9 @@ checking_info validate_checks_side1(position p) {
     return ci;
   }
 
-  if (p.sides[0].fixed_rooks) {
+  if (p.sides[0]._fr) {
     // Side 0 rook hasn't moved, and side 1 king can't move into check
-    if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) &
-        p.sides[0].fixed_rooks) {
+    if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & p.sides[0]._fr) {
       ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
       return ci;
     }
