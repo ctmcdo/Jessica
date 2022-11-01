@@ -7,11 +7,7 @@
 #define WHITE_SQ_MASK 0xAA55AA55AA55AA55
 #define BLACK_SQ_MASK 0x55AA55AA55AA55AA
 
-typedef struct {
-  int slack[NUM_SIDES];
-} bishop_slack;
-
-bishop_slack bishop_promotion_slacks(position p) {
+slack bishop_affected_promotion_slack(position p) {
   int num_pawns[NUM_SIDES];
   int num_base;
   int promotions[NUM_SIDES] = {0};
@@ -31,16 +27,11 @@ bishop_slack bishop_promotion_slacks(position p) {
         _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & WHITE_SQ_MASK);
     int num_black_sq_bishops =
         _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & BLACK_SQ_MASK);
-    if (num_black_sq_bishops == 0 || num_white_sq_bishops == 0) {
+    if (_mm_popcnt_u64(p.sides[i].pieces[BISHOP]) &&
+        (num_black_sq_bishops == 0 || num_white_sq_bishops == 0)) {
       promotions[i] += 1;
     }
   }
 
-  slack s =
-      promotion_slacks(num_pawns, total_base_capturable_pieces, promotions);
-  bishop_slack bs;
-  bs.slack[0] = min3(s.pawn_slack[0], s.chessmen_slack[0], s.chessmen_slack[1]);
-  bs.slack[1] = min3(s.pawn_slack[1], s.chessmen_slack[0], s.chessmen_slack[1]);
-
-  return bs;
+  return promotion_slack(num_pawns, total_base_capturable_pieces, promotions);
 }

@@ -6,7 +6,7 @@ CFLAGS = -fPIC -pthread -mabm -mbmi -mbmi2 -Wall
 OPTIMISATION = -O3
 
 SRC = $(filter-out $(wildcard *test.c), $(wildcard *.c))
-SRC += -I dependencies/hungarian dependencies/hungarian/hungarian.c
+# SRC += -I dependencies/hungarian dependencies/hungarian/hungarian.c
 
 all:
 	$(CC) ${SRC} -o ${EXECUTABLE_NAME} $^ ${LIBS} ${CFLAGS} ${OPTIMISATION} -DNDEBUG

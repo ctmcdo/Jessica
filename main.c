@@ -11,7 +11,7 @@
 
 #include "filter_bishop.h"
 #include "filter_check.h"
-#include "filter_pawn.h"
+// #include "filter_pawn.h"
 #include "position.h"
 #include "position_sanity.h"
 #include "tree_create.h"
@@ -181,32 +181,29 @@ int main(int argc, char **argv) {
 
     sanity_check_position(p);
 
-    /*
     checking_info ci = validate_checks(p);
     char check_code = ci.code;
     if (check_code != 0) {
       // printf("Invalid check code %d: ", check_code);
-
-      p.side0isBlack = i % NUM_SIDES == 1;
-      if (p.side0isBlack) {
-        p = rotate_position_across_central_rows(p);
-      }
+      // if (p.side0isBlack) {
+      //  p = rotate_position_across_central_rows(p);
+      //}
       // print_fen(p);
       continue;
     }
 
-    bishop_slack bs = bishop_promotion_slacks(p);
-    if (bs.slack[0] < 0 || bs.slack[1] < 0) {
-      // printf("Invalid promotions code %d: ", promotions_code);
-
-      p.side0isBlack = i % NUM_SIDES == 1;
-      if (p.side0isBlack) {
-        p = rotate_position_across_central_rows(p);
-      }
+    slack bas = bishop_affected_promotion_slack(p);
+    if (bas.pawn_slack[0] < 0 || bas.pawn_slack[1] < 0 ||
+        bas.chessmen_slack[0] < 0 || bas.chessmen_slack[1] < 0) {
+      // printf("Invalid bishop affected promotion slack\n");
+      // if (p.side0isBlack) {
+      //  p = rotate_position_across_central_rows(p);
+      //}
       // print_fen(p);
       continue;
     }
 
+    /*
     // now we assume every piece we take is not a pawn
     int pawn_cost_code = validate_pawn_cost(p, bs.slack[0], bs.slack[1]);
     if (pawn_cost_code != 0) {

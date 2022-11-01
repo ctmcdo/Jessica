@@ -61,7 +61,7 @@ typedef struct checking_info {
 } checking_info;
 
 typedef struct checking_piece {
-  bool type_is_queen;
+  bool is_queen;
   int bit;
   uint64_t ray;
   int aspect;
@@ -200,7 +200,7 @@ checking_piece get_sliding_attack_from_ahead(uint64_t pot_checking_queens,
   int queen_tz = _tzcnt_u64(checking_ray & pot_checking_queens);
   if (queen_tz < tz) {
     tz = queen_tz;
-    cp.type_is_queen = true;
+    cp.is_queen = true;
   }
 
   int type2_tz = _tzcnt_u64(checking_ray & type2_bb);
@@ -228,7 +228,7 @@ checking_piece get_sliding_attack_from_behind(uint64_t pot_checking_queens,
   int queen_lz = _lzcnt_u64(pot_checking_queens & checking_ray);
   if (queen_lz < lz) {
     lz = queen_lz;
-    cp.type_is_queen = true;
+    cp.is_queen = true;
   }
 
   int type2_lz = _lzcnt_u64(type2_bb & checking_ray);
@@ -334,19 +334,15 @@ checking_info validate_checks_side1(position p) {
     return ci;
   }
 
-  int num_sliding_attacks[NUM_SLIDING_TYPES] = {0};
   // sliding pieces which are attacking opposition king.
-  checking_piece sliding_attacks_by_piece_type[NUM_SLIDING_TYPES] = {0};
-  for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
-    sliding_attacks_by_piece_type[i].bit = NUM_SQUARES;
-    sliding_attacks_by_piece_type[i].aspect = MOORE_NEIGHBOURHOOD_SIZE;
+  checking_piece sliding_attacks[2] = {0};
+  for (int i = 0; i < 2; i++) {
+    sliding_attacks[i].bit = NUM_SQUARES;
+    sliding_attacks[i].aspect = MOORE_NEIGHBOURHOOD_SIZE;
   }
 
-  int sliding_attacks_by_direction[MOORE_NEIGHBOURHOOD_SIZE];
-  for (int i = 0; i < MOORE_NEIGHBOURHOOD_SIZE; i++) {
-    sliding_attacks_by_direction[i] = NUM_SQUARES;
-  }
-
+  int num_sliding_attacks = 0;
+  int num_sliding_attacks_by_piece_type[NUM_SLIDING_TYPES] = {0};
   uint64_t occupied_squares = get_occupied_squares(p);
   uint64_t blocking_chessmen = occupied_squares - p.sides[0].pieces[QUEEN];
   // for i in {NORTH-WEST, NORTH, NORTH-EAST, ..., WEST}
@@ -363,14 +359,13 @@ checking_info validate_checks_side1(position p) {
 
     // If there is a checking piece on this line
     if (cp.bit != NUM_SQUARES) {
-      sliding_attacks_by_direction[i] = cp.bit;
-      if (cp.type_is_queen) {
-        sliding_attacks_by_piece_type[SLIDING_QUEEN_INDEX] = cp;
-        num_sliding_attacks[SLIDING_QUEEN_INDEX]++;
+      if (cp.is_queen) {
+        num_sliding_attacks_by_piece_type[SLIDING_QUEEN_INDEX]++;
       } else {
-        sliding_attacks_by_piece_type[other_piece_type] = cp;
-        num_sliding_attacks[other_piece_type]++;
+        num_sliding_attacks_by_piece_type[other_piece_type]++;
       }
+      ++num_sliding_attacks;
+      sliding_attacks[(num_sliding_attacks + 1) % 2] = cp;
     }
   }
 
@@ -382,10 +377,8 @@ checking_info validate_checks_side1(position p) {
     return ci;
   }
 
-  int num_checking_chessmen = num_checking_knights +
-                              num_sliding_attacks[BISHOP] +
-                              num_sliding_attacks[SLIDING_QUEEN_INDEX] +
-                              num_sliding_attacks[ROOK] + num_checking_pawns;
+  int num_checking_chessmen =
+      num_checking_knights + num_sliding_attacks + num_checking_pawns;
   assert(num_checking_chessmen >= 0 && num_checking_chessmen <= 10);
 
   if (num_checking_chessmen > 2) {
@@ -412,13 +405,13 @@ checking_info validate_checks_side1(position p) {
     return ci;
   }
 
-  if (p.sides[0]._fr) {
-    // Side 0 rook hasn't moved, and side 1 king can't move into check
-    if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & p.sides[0]._fr) {
-      ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
-      return ci;
-    }
-  }
+  // if (p.sides[0]._fr) {
+  // Side 0 rook hasn't moved, and side 1 king can't move into check
+  // if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & p.sides[0]._fr) {
+  //  ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
+  // return ci;
+  // }
+  // }
 
   // Starting pawn hasn't moved and opposition king can't move into check
   if (checking_pawns && (king_bit < ENPASSANT_RANK * BOARD_SIDE_LENGTH)) {
@@ -431,10 +424,11 @@ checking_info validate_checks_side1(position p) {
   }
 
   // else we have 2 checking chessmen
-  if (checking_knights) {
-    return ci;
-  }
+  // if (checking_knights) {
+  //   return ci;
+  //  }
 
+  /*
   int aspect_diff = 0;
   int aspect_total = 0;
   for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
@@ -453,6 +447,7 @@ checking_info validate_checks_side1(position p) {
     ci.code = OBTUSE_ASPECTS;
     return ci;
   }
+  */
 
   return ci;
 }

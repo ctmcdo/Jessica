@@ -315,11 +315,11 @@ position retrieve_position(position_node *root, mpz_t index) {
     cost_boundary_indices[i] =
         fr_coveredSetIndex_permAddnCost_numPerms[nfr[i]][coveredSet_indices[i]];
   }
-  slack prom_slacks =
-      promotion_slacks(num_pawns, total_base_capturable_pieces, promotions);
+  slack prom_slack =
+      promotion_slack(num_pawns, total_base_capturable_pieces, promotions);
   permutation_indices pi = get_permutation_index(
-      prom_slacks.pawn_slack,
-      min(prom_slacks.chessmen_slack[0], prom_slacks.chessmen_slack[1]),
+      prom_slack.pawn_slack,
+      min(prom_slack.chessmen_slack[0], prom_slack.chessmen_slack[1]),
       cost_boundary_indices, mpz_get_ui(index));
 
   int *permutations[NUM_SIDES];
