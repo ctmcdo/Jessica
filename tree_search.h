@@ -5,14 +5,9 @@
 #include <nmmintrin.h>
 #include <stdio.h>
 
-#include "chess_constants.h"
-#include "position.h"
+#include "chess.h"
 #include "prom_slack.h"
 #include "tree_common.h"
-#include "util.h"
-
-// TODO: are the fixed rook cases balanced between white and black?
-// -> they don't seem to be
 
 #define EDGE_ROW_MASK                                                          \
   -1 - ((1UL << (7 * BOARD_SIDE_LENGTH)) - 1) + ((1UL << BOARD_SIDE_LENGTH) - 1)
@@ -22,6 +17,17 @@ int BASE_PIECES[NUM_FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING];
 typedef struct {
   int indices[NUM_SIDES];
 } permutation_indices;
+
+// taken from chessprogrammingwiki->flipping,
+// mirroring and rotating.
+uint64_t rotate_bitboard_across_central_rows(uint64_t x) {
+  return ((x << 56)) | ((x << 40) & (uint64_t)(0x00ff000000000000)) |
+         ((x << 24) & (uint64_t)(0x0000ff0000000000)) |
+         ((x << 8) & (uint64_t)(0x000000ff00000000)) |
+         ((x >> 8) & (uint64_t)(0x00000000ff000000)) |
+         ((x >> 24) & (uint64_t)(0x0000000000ff0000)) |
+         ((x >> 40) & (uint64_t)(0x000000000000ff00)) | ((x >> 56));
+}
 
 int point_root_to_matching_child(position_node **root, mpz_t index) {
   int i = 0;
@@ -125,6 +131,11 @@ int pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
   mpz_clear(rem);
 
   return num_chessmen;
+}
+
+// (row, column) to bitboard
+uint64_t rcb(int row, int col) {
+  return 1UL << ((row * BOARD_SIDE_LENGTH) + col);
 }
 
 int pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
@@ -315,11 +326,11 @@ position retrieve_position(position_node *root, mpz_t index) {
     cost_boundary_indices[i] =
         fr_coveredSetIndex_permAddnCost_numPerms[nfr[i]][coveredSet_indices[i]];
   }
-  slack prom_slacks =
-      promotion_slacks(num_pawns, total_base_capturable_pieces, promotions);
+  slack prom_slack =
+      promotion_slack(num_pawns, total_base_capturable_pieces, promotions);
   permutation_indices pi = get_permutation_index(
-      prom_slacks.pawn_slack,
-      min(prom_slacks.chessmen_slack[0], prom_slacks.chessmen_slack[1]),
+      prom_slack.pawn_slack,
+      min(prom_slack.chessmen_slack[0], prom_slack.chessmen_slack[1]),
       cost_boundary_indices, mpz_get_ui(index));
 
   int *permutations[NUM_SIDES];

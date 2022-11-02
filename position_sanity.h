@@ -2,12 +2,11 @@
 #include <nmmintrin.h>
 #include <stdlib.h>
 
-#include "position.h"
-#include "util.h"
+#include "chess.h"
 
 // This isn't a filter but a sanity check. It should only
 // fail if there's a bug in the creation / searching of the
-// sample tree
+// sample tree.
 
 void sanity_check_position(position p) {
 
@@ -37,6 +36,8 @@ void sanity_check_position(position p) {
   }
 
   // enpassant
+  // Note that we potentially flip the enpassant squares later in main.c
+  // so here enpassant square can only be on the 4th rank
   int num_enpassant_pawns = _mm_popcnt_u64(p.enpassant);
   if (num_enpassant_pawns == 1) {
     // only on 4th rank
@@ -45,6 +46,8 @@ void sanity_check_position(position p) {
     assert(0 == (checkers & (p.enpassant >> 8)));
     assert(0 == (checkers & (p.enpassant >> (2 * 8))));
     // at least one adjacent pawn
+#ifndef NDEBUG
+    // I use guards here to avoid an unused variable warning. Same below
     uint64_t adjacent_mask;
     if (rcb(3, 0) == p.enpassant) {
       adjacent_mask = rcb(3, 1);
@@ -56,10 +59,12 @@ void sanity_check_position(position p) {
     assert(p.sides[1].pawns & adjacent_mask);
     // is accounted for by pawns
     assert(p.enpassant & p.sides[0].pawns);
+#endif
   } else {
     assert(0 == num_enpassant_pawns);
   }
 
+#ifndef NDEBUG
   // rooks with castling rights
   // and kings at home
   if (0 < p.sides[0]._fr) {
@@ -77,4 +82,5 @@ void sanity_check_position(position p) {
     assert(0 != (p.sides[1].pieces[2] & fixed_rooks_mask));
     assert(p.sides[1]._fr & p.sides[1].pieces[2]);
   }
+#endif
 }

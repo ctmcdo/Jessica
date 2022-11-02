@@ -1,9 +1,9 @@
 #include "prom_slack.h"
-#include "chess_constants.h"
+#include "chess.h"
 
-slack promotion_slacks(int pawns[NUM_SIDES],
-                       int total_base_capturable_pieces[NUM_SIDES],
-                       int promotions[NUM_SIDES]) {
+slack promotion_slack(int pawns[NUM_SIDES],
+                      int total_base_capturable_pieces[NUM_SIDES],
+                      int promotions[NUM_SIDES]) {
   int total_chessmen[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     total_chessmen[i] =

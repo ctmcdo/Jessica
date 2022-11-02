@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "chess_constants.h"
+#include "chess.h"
 #include "prom_slack.h"
 #include "tree_common.h"
-#include "util.h"
 
 // I document this file from the end upwards, so you'd be best starting
 // from the bottom.
@@ -24,6 +23,8 @@
 
 // TODO: check via gdb that we can't have side0pawns == 2 and side1pawns == 1 if
 // no enpassant!
+
+uint64_t binomials[NUM_SQUARES + 1][MAX_BISHOPS_PSIDE + 1];
 
 // Can have 0, 1, or 2 rooks with castling rights
 // |{0, 1, 2}| = 3
@@ -88,9 +89,9 @@ void count_from_pieces_helper(
   const int piece_type =
       (int)((rel_level - (side + 1)) % NUM_PIECE_TYPES_LESS_KING);
 
-  slack prom_slacks =
-      promotion_slacks(pawns, total_base_capturable_pieces, promotions);
-  int piece_lim2 = prom_slacks.chessmen_slack[side];
+  slack prom_slack =
+      promotion_slack(pawns, total_base_capturable_pieces, promotions);
+  int piece_lim2 = prom_slack.chessmen_slack[side];
   int max_base_pieces = BASE_PIECES[fixed_rooks[side]][piece_type];
   if (piece_lim2 > max_base_pieces) {
     piece_lim2 = max_base_pieces + (int)((piece_lim2 - max_base_pieces) / 2);
@@ -99,7 +100,7 @@ void count_from_pieces_helper(
   // opposition's promotions. This only applies to side1 ensuring side0's
   // promotions are valid because side0 is computed assuming side1 has nothing
   // but a king on the board
-  int piece_lim3 = prom_slacks.chessmen_slack[!side];
+  int piece_lim3 = prom_slack.chessmen_slack[!side];
   // Pieces are assumed to be base pieces up to max_base_pieces. Otherwise by
   // considering a piece promoted where it could be base we would be decreasing
   // the number of pieces the side with the piece-in-question can have by 1 and
@@ -107,7 +108,7 @@ void count_from_pieces_helper(
   if (piece_lim3 > max_base_pieces) {
     piece_lim3 = max_base_pieces + (int)((piece_lim3 - max_base_pieces) / 2);
   }
-  int max_pieces = min3(max_base_pieces + prom_slacks.pawn_slack[side],
+  int max_pieces = min3(max_base_pieces + prom_slack.pawn_slack[side],
                         piece_lim2, piece_lim3);
   assert(0 <= max_pieces && max_pieces <= 10);
 
@@ -167,13 +168,13 @@ void count_from_pieces_helper(
         cost_boundary_indices[j] =
             fr_coveredSetIndex_permAddnCost_numPerms[fixed_rooks[j]][csj];
       }
-      slack prom_slacks = promotion_slacks(
+      slack prom_slack = promotion_slack(
           pawns, new_total_base_capturable_pieces, new_promotions);
       uint64_t variations =
           binomials[num_occupiable_squares][i] *
           num_piece_type_permutations(
-              prom_slacks.pawn_slack,
-              min(prom_slacks.chessmen_slack[0], prom_slacks.chessmen_slack[1]),
+              prom_slack.pawn_slack,
+              min(prom_slack.chessmen_slack[0], prom_slack.chessmen_slack[1]),
               cost_boundary_indices);
       int new_num_occupiable_squares = num_occupiable_squares - i;
       for (int j = 0; j < NUM_SIDES; j++) {
