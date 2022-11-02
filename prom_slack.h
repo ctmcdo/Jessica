@@ -1,5 +1,5 @@
 #pragma once
-#include "chess_constants.h"
+#include "chess.h"
 
 // The four constraints we adhere to
 typedef struct {

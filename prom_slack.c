@@ -1,5 +1,5 @@
 #include "prom_slack.h"
-#include "chess_constants.h"
+#include "chess.h"
 
 slack promotion_slack(int pawns[NUM_SIDES],
                       int total_base_capturable_pieces[NUM_SIDES],

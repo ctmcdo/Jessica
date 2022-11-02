@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "chess_constants.h"
+#include "chess.h"
 #include "prom_slack.h"
 #include "tree_common.h"
-#include "util.h"
 
 // I document this file from the end upwards, so you'd be best starting
 // from the bottom.
@@ -24,6 +23,8 @@
 
 // TODO: check via gdb that we can't have side0pawns == 2 and side1pawns == 1 if
 // no enpassant!
+
+uint64_t binomials[NUM_SQUARES + 1][MAX_BISHOPS_PSIDE + 1];
 
 // Can have 0, 1, or 2 rooks with castling rights
 // |{0, 1, 2}| = 3
