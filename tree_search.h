@@ -134,7 +134,7 @@ int pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
 }
 
 // (row, column) to bitboard
-uint64_t rcb(char row, char col) {
+uint64_t rcb(int row, int col) {
   return 1UL << ((row * BOARD_SIDE_LENGTH) + col);
 }
 

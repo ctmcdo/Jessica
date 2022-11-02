@@ -34,7 +34,7 @@ extern uint64_t binomials[NUM_SQUARES + 1][MAX_BISHOPS_PSIDE + 1];
 typedef struct position_node {
   mpz_t num_positions;
   struct position_node **children;
-  char num_children;
+  int num_children;
 } position_node;
 
 enum castling_rights_cases {

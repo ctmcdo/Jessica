@@ -14,11 +14,7 @@
 #include "tree_create.h"
 #include "tree_search.h"
 
-#define NUM_THREADS 8
 #define TEN_THOUSAND 10000
-
-// TODO: use int instead of char in for loops
-// and also in functions etc, shouldn't use chars
 
 void compute_binomials() {
   for (int n = 0; n <= NUM_SQUARES; n++) {
@@ -72,6 +68,7 @@ int main(int argc, char **argv) {
     sample_size = TEN_THOUSAND;
     printf("Using default sample size of ten thousand\n");
   }
+
   for (int i = 0; i < sample_size; i++) {
     mpz_urandomm(rng, s, root->num_positions);
     position p = retrieve_position(root, rng);

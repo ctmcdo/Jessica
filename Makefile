@@ -2,7 +2,7 @@ EXECUTABLE_NAME = Jess
 
 CC = gcc
 LIBS = -lgmp -lm 
-CFLAGS = -fPIC -pthread -mabm -mbmi -mbmi2 -Wall
+CFLAGS = -pthread -mabm -mbmi -mbmi2 -Wall
 OPTIMISATION = -O3
 
 SRC = $(filter-out $(wildcard *test.c), $(wildcard *.c))
