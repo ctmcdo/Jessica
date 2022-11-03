@@ -1,7 +1,6 @@
 #pragma once
 #include "chess.h"
 
-// The four constraints we adhere to
 typedef struct {
   int pawn_slack[NUM_SIDES];
   int chessmen_slack[NUM_SIDES];

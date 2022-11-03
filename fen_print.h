@@ -93,7 +93,6 @@ void print_fen(position p) {
     char row_num = 1 + ((int)(ep / BOARD_SIDE_LENGTH));
     assert(row_num == 4 || row_num == 5);
     if (row_num == 4) {
-      // the enpassant square is the square behind the pawn that just moved 2
       printf("3");
     } else {
       printf("6");
