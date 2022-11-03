@@ -1,15 +1,9 @@
 #include <assert.h>
-#include <gmp.h>
 #include <immintrin.h>
-#include <inttypes.h>
-#include <math.h>
-#include <nmmintrin.h>
-#include <pthread.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "fen_print.h"
+#include "filter_bishop.h"
 #include "position_sanity.h"
 #include "tree_create.h"
 #include "tree_search.h"
@@ -69,7 +63,7 @@ int main(int argc, char **argv) {
     printf("Using default sample size of ten thousand\n");
   }
 
-  for (int i = 0; i < sample_size; i++) {
+  for (int i = 0; i < sample_size;) {
     mpz_urandomm(rng, s, root->num_positions);
     position p = retrieve_position(root, rng);
 
@@ -77,10 +71,17 @@ int main(int argc, char **argv) {
     sanity_check_position(p);
 #endif
 
+    slack bas = bishop_affected_promotion_slack(p);
+    if (bas.pawn_slack[0] < 0 || bas.pawn_slack[1] < 0 ||
+        bas.chessmen_slack[0] < 0 || bas.chessmen_slack[1] < 0) {
+      continue;
+    }
+
     if (p.side0isBlack) {
       p = rotate_position_across_central_rows(p);
     }
     print_fen(p);
+    ++i;
   }
 
   return 0;

@@ -10,6 +10,9 @@ We use threading to build the tree, but not for sampling. To generate a large nu
 
 We sanity check the generated positions for qualities such as no two chessmen on the same square, both kings are on the board and enpassant pawn is on 4th or 5th rank.
 
+We include an example of a simple position filter which takes into account bishops on same coloured squares and the effect on minimum promotions.
+
 ## Dependencies
 An x86 processor which supports -mabm -mbmi -mbmi2
+
 GMP

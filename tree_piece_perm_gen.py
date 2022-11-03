@@ -13,7 +13,7 @@ NUM_NON_FIXED_CAPTURABLE_BASE_PIECES = [[2, 2, 2, 1], [2, 2, 1, 1], [2, 2, 1, 0]
 ############################################################### <-->
 ########################### Notice how we switch queens and rooks ^
 
-# We define a covered set (for a fixed rook scenario) to be of the form [i, j, k, l],
+# We define a covered set (for a fixed rook scenario) to be of the form (i, j, k, l),
 # 2 >= i >= j >= k >= l >= 0, l < 2 and (a) k < 2 if we're considering a scenario
 # with at least 1 fixed rook, (b) l == 0 if 2 fixed rooks, which corresponds to the
 # base piece scenarios above. Every side has an associated covered set which represents
@@ -53,17 +53,17 @@ ADDN_COST_TO_NPERMS_SHAPE = (
     NUM_UNIQUE_PERM_COSTS,
 )
 
-# covered set indices -> for the fixed rook scenario and [i, j, k, l], get an
-# associated index
+# For a fixed rook scenario and (i, j, k, l), return an associated index
 fr_coveredSet_index = np.negative(np.ones(CS_INDEX_SHAPE, np.int32))
 
-# for a fixed rook scenario, a covered set index, and a permutation number (which
-# will be in [0, 24), return the permutation. The permutations are partially ordered
-# by the minimum promotion cost
+# For a fixed rook scenario, a covered set index, and a permutation number (which
+# will be in [0, 24)), return the permutation.
+# Permutations are partially ordered by minimum additional promotions
 fr_coveredSetIndex_permIndex_perm = np.negative(np.ones(PERMS_SHAPE, np.int32))
 
-# for a fixed rook scenario and a covered set index, get the number of permutations
-# with minimum additional promotion cost of 0, 1, 2, 3. It's cumulative
+# For a fixed rook scenario, a covered set index, and a minimum additional promotions
+# in {0, 1, 2, 3}, return the number of promotions with less than or equal to the
+# input minimum additional promotions
 fr_coveredSetIndex_permAddnCost_numPerms = np.negative(
     np.ones(ADDN_COST_TO_NPERMS_SHAPE, np.int32)
 )
