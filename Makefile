@@ -5,7 +5,7 @@ LIBS = -lgmp -lm
 CFLAGS = -pthread -mabm -mbmi -mbmi2 -Wall
 OPTIMISATION = -O3
 
-SRC = $(filter-out $(wildcard *test.c), $(wildcard *.c))
+SRC = $(filter-out $(wildcard *test.c unused_check_filter.c unused_pawn_filter.c), $(wildcard *.c))
 
 all:
 	$(CC) ${SRC} -o ${EXECUTABLE_NAME} $^ ${LIBS} ${CFLAGS} ${OPTIMISATION} -DNDEBUG
