@@ -11,19 +11,6 @@
 // I document this file from the end upwards, so you'd be best starting
 // from the bottom.
 
-// TODO: introduce a notion of pseudo side or something. If symmetry in pawn,
-// and potentially in pawns and fixed rooks etc, we have a pseudo side which
-// actually maps to either side0 or side1. Side0 or side1 (which ever it is) is
-// always the side to move... and if no enpassant and unquel pawns or no
-// enpassant, equal pawns and different fixed rooks, pseudoside0 actually maps
-// to side0 or side1. If no enpassant, equal paawns and equal fixed rooks then
-// pseudo side0 always maps to side0...
-// And in practice that means that we just say which side is to move, because
-// the only thing that matters about side0 is that only side0 can move
-
-// TODO: check via gdb that we can't have side0pawns == 2 and side1pawns == 1 if
-// no enpassant!
-
 uint64_t binomials[NUM_SQUARES + 1][MAX_BISHOPS_PSIDE + 1];
 
 // Can have 0, 1, or 2 rooks with castling rights
@@ -37,7 +24,6 @@ int BASE_PIECES[NUM_FIXED_ROOK_SCENARIOS][NUM_PIECE_TYPES_LESS_KING] = {
 int factorials[NUM_PIECE_TYPES_LESS_KING] = {1, 2, 6, FOUR_FACTORIAL};
 int pieces[NUM_SIDES][NUM_PIECE_TYPES_LESS_KING] = {0};
 
-// TODO: struct packing?
 typedef struct {
   position_node *root;
   int free_pawns[NUM_SIDES];
@@ -73,9 +59,8 @@ uint32_t num_piece_type_permutations(int pawn_slack[NUM_SIDES],
   return variations;
 }
 
-// Level 6 onwards represents generic pieces. We don't assign a piece type until
-// later, So we can tell we have x number of this piece type, y number of this
-// piece type etc. We require two 0 levels or max level to reach leaf.
+// Level 6 onwards represents generic pieces. We don't assign a piece types
+// until within the search tree.
 void count_from_pieces_helper(
     position_node *root, int pawns[NUM_SIDES], int fixed_rooks[NUM_SIDES],
     int non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES],
@@ -170,6 +155,12 @@ void count_from_pieces_helper(
       }
       slack prom_slack = promotion_slack(
           pawns, new_total_base_capturable_pieces, new_promotions);
+      // If a permutation utilises one less base piece, then it has one more
+      // promotion. By looking at our constraint in prom_slack, we see that one
+      // additional promotion and one less base piece decreases the chessmen
+      // slack for both sides by 1. Therefore, we only need to pass in the
+      // minimum of both side's chessmen slack. The same can't be said of pawn
+      // slack: it's not affected by opposition promotions
       uint64_t variations =
           binomials[num_occupiable_squares][i] *
           num_piece_type_permutations(
@@ -180,7 +171,7 @@ void count_from_pieces_helper(
       for (int j = 0; j < NUM_SIDES; j++) {
         if (fixed_rooks[j] == 0) {
           variations *= new_num_occupiable_squares;
-          --new_num_occupiable_squares;
+          --new_num_occupiable_squares; // king
         }
       }
       mpz_init_set_ui(root->children[i]->num_positions, variations);
@@ -236,13 +227,8 @@ void *count_from_pieces(void *arg) {
   return NULL;
 }
 
-// TODO: threading comment
 // Level 4 and 5 account for rooks with castling rights (which we also call
-// fixed rooks) and kings. We thread from this function.
-// There are 3 enpassant cases ... per side there are 3 * 3 = 9 threads used
-// to build the sample structure. We have 6 threads. 3 simpler. Average
-// computer 4 cores. With hyperthreading 8 threads. But since 3 will finish
-// quicker, left with 3 without hyperthreading which is ideal.
+// fixed rooks) and kings. We thread from this function
 void *count_from_fixed_rooks_and_kings(void *arg) {
   threading_struct ts = *(threading_struct *)arg;
 
@@ -309,10 +295,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
                ONE_FIXED_ROOK_VARIATIONS); // 2; fixed rook can be either side
   }
 
-  // TODO comment: we mul by 2 because pseudo side0 can map to side0 or
-  // side1.
-
-  // Account for symmetry avoiding fr[0] == fr[1]
+  // Account for side to move, making sure to avoid fr[0] == fr[1]
   if (ts.side && !ts.enpassant && (ts.free_pawns[0] == ts.free_pawns[1])) {
     for (int i = 0; i < num_children - 1; i++) {
       mpz_mul_ui(ts.root->children[i]->num_positions,
@@ -366,11 +349,7 @@ void count_from_free_pawns(position_node *root, position_node *eerroot,
 
         (*count_from_fixed_rooks_and_kings)(&t);
 
-        // TODO comment: we mul by 2 because pseudo side0 can map to side0 or
-        // side1. In essence it dictates which side is to move... because only
-        // diff between side0 and side1 is side1 is to move
-
-        // Accounting for symmetry
+        // Account for side to move
         if (!enpassant && i != previous_free_pawns) {
           mpz_mul_ui(root->children[i]->num_positions,
                      root->children[i]->num_positions, 2);
@@ -447,32 +426,28 @@ void *count_from_enpassant(position_node *root) {
 }
 
 // Our sample space is a tree. The tree must contain at least every reachable
-// position in chess, but will also contain unreachable positions as well.
-// Each level of the tree represents a characteristic of a board, where boards
-// with the exact same characteristics are represented by the same leaf. The
-// tree doesn't store exact positions of course, that would be far too much
-// memory. We abstract where exactly most pieces are. We include as much
-// structure - where chessmen are or are bound within - as we would like to
-// use. As potentially reachable positions which we generate from searching
-// the tree we build in this file will be filtered by considering unreachable
-// conditions, we can keep certain types of unreachable positions in our tree
-// for later filtering where it makes sense. The tree is actually a DAG
-// because certain nodes at the pawn level point to the same children.
-// Ultimately the tree only has to be optimised to a point where it can be
-// stored in a reasonable amount of memory and built within a reasonable
+// position in chess, but will also contain unreachable positions. Each level of
+// the tree represents a characteristic of a board, where boards with the exact
+// same characteristics are represented by the same leaf. The tree doesn't store
+// exact positions of course, that would be far too much memory. We abstract
+// where exactly most pieces are. We include as much structure - where chessmen
+// are or are bound within - as we need to generate positions. The tree is
+// actually a DAG because certain nodes at the pawn level point to the same
+// children. Ultimately the tree only has to be optimised to a point where it
+// can be stored in a reasonable amount of memory and built within a reasonable
 // amount of time. We build the tree in a DFS manner.
 //
 // Nodes in the tree are of type position_node which contains a GMP mpz_t for
-// the size of the subtree rooted at the node, a char for the number of child
+// the size of the subtree rooted at the node, an int for the number of child
 // nodes and an array of child nodes
 void build_sample_space(position_node *root) {
   count_from_enpassant(root);
   // Our abstracted position is a tuple (side0, side1, enpassant_square,
   // move). Note that side0 and side1 don't signify white and black. We
-  // enforce that only side1 can have an en-passant capture available. We also
-  // enforce that if there's no en-passant square that only one of (s0, s1, m)
-  // and (s1, s0, m) is accounted for in the tree. Therefore every position
-  // can be cast to w/b or b/w and hence we multiply the size of the tree by 2
-  // to represent the colour permutations.
+  // enforce that only side1 can have an en-passant capture available. When
+  // there is no en-passant square and s0 == s1, we include just one of (s0,
+  // s1, m) and (s1, s0, m). Therefore every position can be cast to w/b or b/w
+  // and hence we multiply the size of the tree by 2 to represent the colour
+  // permutations.
   mpz_mul_ui(root->num_positions, root->num_positions, 2);
 }

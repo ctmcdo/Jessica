@@ -19,10 +19,11 @@ slack promotion_slack(int pawns[NUM_SIDES],
     // to move forward without capturing they would eventually deadlock.
     // Therefore to promote, one pawn must either (1) be captured - unblocking
     // the file for at least one opposing pawn or (2) make a capture leaving
-    // it on its promotion-rank-side of any opposition pawns on the file. If a
-    // piece is missing we can assume a pawn captured it. If a pawn is missing
-    // (and is not considered a promotion) we can assume a pawn captured it
-    // and freed another pawn on the capture file
+    // it on its promotion-rank-side of any opposition pawns on the file, or at
+    // least freeing the file for the opposition pawn. If a piece is missing we
+    // can assume a pawn captured it. If a pawn is missing (and is not
+    // considered a promotion) we can assume a pawn captured it and freed
+    // another pawn on the capture file
     int opp = (i + 1) % NUM_SIDES;
     s.chessmen_slack[i] =
         2 * (NUM_PAWNS_PSIDE - pawns[opp] - promotions[opp]) +

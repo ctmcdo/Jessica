@@ -2,21 +2,26 @@ import itertools as it
 import math
 import numpy as np
 
-# TODO: have a cumulative cost boundaries and a regular too
-
 # Can have 0, 1, or 2 rooks with castling rights
 NUM_FIXED_ROOK_SCENARIOS = 3
 
 # Dimension 0 represents the number of rooks with castling rights.
 # Dimension 1 is the piece type, which varies for 2 fixed rooks because
 # we purposedly keep the array values decreasing
-NUM_NON_FIXED_BASE_PIECES = [[2, 2, 2, 1], [2, 2, 1, 1], [2, 2, 1, 0]]
+NUM_NON_FIXED_CAPTURABLE_BASE_PIECES = [[2, 2, 2, 1], [2, 2, 1, 1], [2, 2, 1, 0]]
 ############################# b, n, r, q    b, n, r, q    b, n, q, r
 ############################################################### <-->
 ########################### Notice how we switch queens and rooks ^
 
-# TODO: better comment. Remember that ignore 2s is key to this formula
-# sum_{i=1}^{4}(i + 1) = 14
+# We define a covered set (for a fixed rook scenario) to be of the form [i, j, k, l],
+# 2 >= i >= j >= k >= l >= 0, l < 2 and (a) k < 2 if we're considering a scenario
+# with at least 1 fixed rook, (b) l == 0 if 2 fixed rooks, which corresponds to the
+# base piece scenarios above. Every side has an associated covered set which represents
+# its base pieces. We consider permutations of covered sets ignoring the constraint
+# i >= j >= k >= l. Each permutation has an associated increase in minimum promotions.
+# There are far less covered sets than sides and hence we drastically reduce the
+# computation behind generating promotion-feasible permutations.
+# The number of covered sets is sum_{i=1}^{4}(i + 1) = 14
 NUM_COVERED_SETS = 14
 
 # We can only start with at most 2 of any piece type (of the same colour), such as bishops
@@ -48,15 +53,24 @@ ADDN_COST_TO_NPERMS_SHAPE = (
     NUM_UNIQUE_PERM_COSTS,
 )
 
+# covered set indices -> for the fixed rook scenario and [i, j, k, l], get an
+# associated index
 fr_coveredSet_index = np.negative(np.ones(CS_INDEX_SHAPE, np.int32))
+
+# for a fixed rook scenario, a covered set index, and a permutation number (which
+# will be in [0, 24), return the permutation. The permutations are partially ordered
+# by the minimum promotion cost
 fr_coveredSetIndex_permIndex_perm = np.negative(np.ones(PERMS_SHAPE, np.int32))
+
+# for a fixed rook scenario and a covered set index, get the number of permutations
+# with minimum additional promotion cost of 0, 1, 2, 3. It's cumulative
 fr_coveredSetIndex_permAddnCost_numPerms = np.negative(
     np.ones(ADDN_COST_TO_NPERMS_SHAPE, np.int32)
 )
 
 
 def covered_sets(fr_case_num):
-    b = NUM_NON_FIXED_BASE_PIECES[fr_case_num]
+    b = NUM_NON_FIXED_CAPTURABLE_BASE_PIECES[fr_case_num]
     s = b.copy()
 
     cset_num = 0
@@ -65,12 +79,14 @@ def covered_sets(fr_case_num):
 
     cset_num += 1
     while s[0] != 0:
+        # generate next covered set
         for i in range(NUM_PIECE_TYPES_LESS_KING - 1, -1, -1):
             if s[i] != 0:
                 s[i] -= 1
                 for j in range(i + 1, NUM_PIECE_TYPES_LESS_KING):
                     s[j] = min(s[i], b[j])
 
+                # and assign it an index
                 fr_coveredSet_index[fr_case_num][s[0]][s[1]][s[2]][s[3]] = cset_num
                 yield s, cset_num
 
@@ -128,7 +144,7 @@ for i in range(NUM_FIXED_ROOK_SCENARIOS):
         cost_to_perms = {}
         for p in it.permutations((0, 1, 2, 3)):
             permuted_set = [s[pe] for pe in p]
-            c = cost(permuted_set, NUM_NON_FIXED_BASE_PIECES[i])
+            c = cost(permuted_set, NUM_NON_FIXED_CAPTURABLE_BASE_PIECES[i])
             if c not in cost_to_perms:
                 cost_to_perms[c] = []
             else:
