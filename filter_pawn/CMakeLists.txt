@@ -68,10 +68,9 @@ endif()
 find_package(ortools REQUIRED CONFIG)
 
 
-add_library(${PROJECT_NAME} filter_pawn.cc ${CMAKE_CURRENT_SOURCE_DIR}/../util.c ${CMAKE_CURRENT_SOURCE_DIR}/../util.h)
-target_compile_options(${PROJECT_NAME} PRIVATE -mbmi)
+add_library(${PROJECT_NAME} filter_pawn.cc)
+target_compile_options(${PROJECT_NAME} PRIVATE -mabm -mbmi -O0)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 #target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 target_link_libraries(${PROJECT_NAME} PRIVATE ortools::ortools)
 

@@ -4,9 +4,12 @@
 
 #include "fen_print.h"
 #include "filter_bishop.h"
+#include "filter_check.h"
+#include "filter_pawn.h"
 #include "position_sanity.h"
 #include "tree_create.h"
 #include "tree_search.h"
+#include "util.h"
 
 #define TEN_THOUSAND 10000
 
@@ -31,7 +34,6 @@ position rotate_position_across_central_rows(position p) {
 
   for (int i = 0; i < NUM_SIDES; i++) {
     rp.sides[i].pawns = rotate_bitboard_across_central_rows(p.sides[i].pawns);
-
     for (int j = 0; j < NUM_PIECE_TYPES; j++) {
       rp.sides[i].pieces[j] =
           rotate_bitboard_across_central_rows(p.sides[i].pieces[j]);
@@ -55,6 +57,7 @@ int main(int argc, char **argv) {
   mpz_t rng;
   mpz_init(rng);
 
+  long successes = 0;
   long sample_size;
   if (argc > 1) {
     sample_size = strtol(argv[1], NULL, 10);
@@ -63,7 +66,7 @@ int main(int argc, char **argv) {
     printf("Using default sample size of ten thousand\n");
   }
 
-  for (int i = 0; i < sample_size;) {
+  for (int i = 0; i < sample_size; i++) {
     mpz_urandomm(rng, s, root->num_positions);
     position p = retrieve_position(root, rng);
 
@@ -71,18 +74,68 @@ int main(int argc, char **argv) {
     sanity_check_position(p);
 #endif
 
+    checking_info ci = validate_checks(p);
+    if (ci.code != 0) {
+      continue;
+    }
+
     slack bas = bishop_affected_promotion_slack(p);
     if (bas.pawn_slack[0] < 0 || bas.pawn_slack[1] < 0 ||
         bas.chessmen_slack[0] < 0 || bas.chessmen_slack[1] < 0) {
       continue;
     }
 
+    uint64_t pawns[] = {p.sides[0].pawns, p.sides[1].pawns};
+    int proms[2] = {0};
+    int num_capturable_chessmen[2];
+    for (int i = 0; i < NUM_SIDES; i++) {
+      num_capturable_chessmen[i] = _mm_popcnt_u64(p.sides[i].pawns);
+      for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
+        num_capturable_chessmen[i] += _mm_popcnt_u64(p.sides[i].pieces[j]);
+      }
+    }
+    if (!FilterPawn(pawns, p.enpassant, num_capturable_chessmen, proms)) {
+      continue;
+    }
+
+    // if (p.enpassant && p.side0isBlack) {
     if (p.side0isBlack) {
       p = rotate_position_across_central_rows(p);
     }
     print_fen(p);
-    ++i;
+    successes++;
   }
+
+  mpf_t p_hat;
+  mpf_init(p_hat);
+  mpf_set_ui(p_hat, successes);
+  mpf_div_ui(p_hat, p_hat, sample_size);
+
+  mpf_t z95;
+  mpf_init(z95);
+  mpf_set_d(z95, 1.96);
+
+  mpf_t standard_err;
+  mpf_init(standard_err);
+  mpf_set_ui(standard_err, 1);
+  mpf_sub(standard_err, standard_err, p_hat);
+  mpf_mul(standard_err, standard_err, p_hat);
+  mpf_div_ui(standard_err, standard_err, sample_size);
+  mpf_sqrt(standard_err, standard_err);
+  mpf_mul(standard_err, standard_err, z95);
+  mpf_t sample_space_size;
+  mpf_init(sample_space_size);
+  mpf_set_z(sample_space_size, root->num_positions);
+  mpf_mul(standard_err, standard_err, sample_space_size);
+
+  mpf_t pbound;
+  mpf_init(pbound);
+  mpf_set(pbound, sample_space_size);
+  mpf_mul(pbound, pbound, p_hat);
+
+  gmp_printf("Probabilistic upperbound on the number of positions in chess is "
+             "%.2FE +- %.2FE\n",
+             pbound, standard_err);
 
   return 0;
 }
