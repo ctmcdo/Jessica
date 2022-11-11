@@ -405,13 +405,13 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
     return ci;
   }
 
-  // if (p.sides[0]._fr) {
+  // if (ps[0]._fr) {
   // Side 0 rook hasn't moved, and side 1 king can't move into check
-  // if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & p.sides[0]._fr) {
-  //  ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
-  // return ci;
+  //  if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & ps[0]._fr) {
+  //   ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
+  //  return ci;
   // }
-  // }
+  //}
 
   // Starting pawn hasn't moved and opposition king can't move into check
   if (checking_pawns && (king_bit < ENPASSANT_RANK * BOARD_SIDE_LENGTH)) {
@@ -424,31 +424,23 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
   }
 
   // else we have 2 checking chessmen
-  // if (checking_knights) {
-  //   return ci;
-  //  }
+  if (checking_knights) {
+    uint64_t ray = sliding_attacks[0].ray + sliding_attacks[1].ray;
+    int nbit = get_index_of_1st_set_bit(checking_knights);
+    int nrow = get_row_num(nbit);
+    if (!(get_knight_moves(nbit) & ray) &&
+        (nrow != 0 && nrow != (BOARD_SIDE_LENGTH - 1))) {
+      ci.code = KNIGHT_DOUBLE_CHECK_NO_INTERSECTION;
+    }
+    return ci;
+  }
 
-  /*
-    int aspect_diff = 0;
-      int aspect_total = 0;
-        for (int i = 0; i < NUM_SLIDING_TYPES; i++) {
-            if (sliding_attacks_by_piece_type[i].aspect !=
-    MOORE_NEIGHBOURHOOD_SIZE) { if (aspect_diff < 0) { aspect_diff +=
-    sliding_attacks_by_piece_type[i].aspect; } else { aspect_diff -=
-    sliding_attacks_by_piece_type[i].aspect;
-                                              }
-                                                    aspect_total +=
-    sliding_attacks_by_piece_type[i].aspect;
-                                                        }
-                                                          }
-                                                            aspect_diff =
-    abs(aspect_diff); if (aspect_diff != 1 &&
-                                                                    !(aspect_diff
-    == SOUTH_WEST && aspect_total == SOUTH_WEST)) { ci.code = OBTUSE_ASPECTS;
-                                                                            return
-    ci;
-                                                                              }
-                                                                                */
+  int aspect_diff = abs(sliding_attacks[0].aspect - sliding_attacks[1].aspect);
+  assert(aspect_diff != 0);
+  if ((aspect_diff > 2 && aspect_diff < 6)) {
+    ci.code = OBTUSE_ASPECTS;
+    return ci;
+  }
 
   return ci;
 }

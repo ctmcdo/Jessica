@@ -76,6 +76,10 @@ int main(int argc, char **argv) {
 
     checking_info ci = validate_checks(p);
     if (ci.code != 0) {
+      // if (ci.code == OBTUSE_ASPECTS) {
+      //  printf("OBTUSE_ASPECTS follows:\n");
+      //  print_fen(p);
+      //}
       continue;
     }
 
@@ -105,6 +109,28 @@ int main(int argc, char **argv) {
     print_fen(p);
     successes++;
   }
+  printf("successes: %ld\n", successes);
+
+  // TODO: actually handle this
+  // 1b1nn111/Bk11Q1P1/1R111Ppr/qbpr111p/11P111pP/1P11PP11/11N111bR/b11N1bKB ->
+  // rook no previous square
+  //
+  // nbQRB1bq/1111rn11/q11n11P1/QPp11P11/1N1111Pp/1KNb1k1p/11111111/q111Rrr1 w -
+  // c6 -> black would have been in check previous move by stationary pawn
+  //
+  // 1111b11b/111R1KrP/NR11N111/11nPp1pQ/Qq11P111/rRBB1111/1p1pPkbR/1bq11111
+  //
+  // 1111nK1r/b11B111q/k1pR1Pr1/bR1Q111N/Q11R1111/qR1111Bp/1RNP1bPp/n1111111
+  //
+  // 111b1b1Q/1Q111111/B1bk1111/111111rK/p1q1ppRr/nn1rB111/rN1RP11Q/N1N1111N
+  //
+  // nRN1qnk1/111111r1/111n1111/1b11111K/11PQn11r/1qB111p1/n11B11BB/1rbBBNbQ
+
+  // likely unreachable
+  // R11111K1/1r111111/1N1QP11q/11qppQ1Q/r11QbqP1/RNbN1111/111nb11R/Q1r1111k b
+
+  // possibly unreachable
+  // qB1n111b/1Q11R1Qk/p11N1Pr1/111p111n/11PK1NBN/1R1n1r1q/1BRr111r/1b1b1111
 
   mpf_t p_hat;
   mpf_init(p_hat);
@@ -133,9 +159,11 @@ int main(int argc, char **argv) {
   mpf_set(pbound, sample_space_size);
   mpf_mul(pbound, pbound, p_hat);
 
-  gmp_printf("Probabilistic upperbound on the number of positions in chess is "
-             "%.2FE +- %.2FE\n",
-             pbound, standard_err);
+  gmp_printf(
+      "Probabilistic upperbound using 95%% C.I. on the number of positions "
+      "in chess is "
+      "%.2FE +- %.2FE\n",
+      pbound, standard_err);
 
   return 0;
 }
