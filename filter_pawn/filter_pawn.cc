@@ -29,8 +29,7 @@ int get_col_num(int n) { return (n % BOARD_SIDE_LENGTH); }
 }
 
 extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
-                           int num_capturable_chessmen[NUM_SIDES],
-                           int min_promotions[NUM_SIDES]) {
+                           int min_promotions_to_acc_for[NUM_SIDES]) {
   CpModelBuilder cp_model;
 
   BoolVar matchedStartingSquares[NUM_SIDES][BOARD_SIDE_LENGTH];
@@ -54,7 +53,6 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     pawnCosts[i].reserve(num_pawns);
     for (int p = 0; p < num_pawns; p++) {
       int tz = __tzcnt_u64(pawns[i]);
-      // std::cout << "tz: " << tz << "\n";
       pawns[i] = __blsr_u64(pawns[i]);
 
       int col = get_col_num(tz);
@@ -85,43 +83,57 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
             cp_model.AddGreaterOrEqual(pawnVars[i][p], k)
                 .onlyEnfoceIf(k_is_covered_by_p);
           }
-          BoolVar k_is_consumed_by_p = cp_model.NewBoolVar();
           BoolVar covered_but_not_matched_literals[2] = {
-              k_is_covered_by_p, matchedStartingSquares[i][k].Not()};
-          cp_model.AddBoolAnd(covered_by_not_matched_literals)
-              .onlyEnforceIf(k_is_consumed_by_p);
-          cp_model.AddImplication(
-              k_is_consumed_by_p,
-              pawnWhichStartedOn_isConsumedByPawnOnTheBoard[opp][k]);
+              k_is_covered_by_p, p_is_matched_to_k.Not()};
+          cp_model.AddBoolAnd(covered_but_not_matched_literals)
+              .onlyEnforceIf(
+                  pawnWhichStartedOn_isConsumedByPawnOnTheBoard[opp][k]);
         }
 
         pawnCosts[i].push_back(cp_model.NewIntVar(COST_DOMAIN));
         cp_model.AddAbsEquality(pawnCosts[i][p], pawnVars[i][p] - p);
-        // if (is_kth_bit_set(mask, tz)) {
-        //  if (tz >= (2 * BOARD_SIDE_LENGTH)) {
-        //    vertices[v][col] = 2;
-        //  } else {
-        //    vertices[v][col] = INFIN;
-        //  }
-        //}
-        //}
       }
     }
 
-    std::vector<std::vector<BoolVar>> pawnWhichStartedOn_isPairedLeft(
+    std::vector<std::vector<std::vector<BoolVar>>> pawnWhichStartedOn_isPaired(
         NUM_SIDES);
-    std::vector<std::vector<BoolVar>> pawnWhichStartedOn_isPairedRight(
-        NUM_SIDES);
-    // then finally, if not matched, nor consumed, nor paired left or right, sum
-    // these. They can also promote. TODO: also take into account
+    int d = 0;
+    int other_direction = 1;
+    for (int i = -1; i <= 1; i += 2) {
+      for (int j = 1; j < BOARD_SIDE_LENGTH; j++) {
+        cp_model.AddEquality(pawnWhichStartedOn_isPaired[d][0][j],
+                             pawnWhichStartedOn_isPaired[d][1][j + i]);
+        BoolVar literals[] = {
+            matchedStartingSquare[0][j].Not(),
+            matchedStartingSquare[1][j + i].Not(),
+            pawnWhichStartedOn_isConsumedByPawnOnTheBoard[0][j].Not(),
+            pawnWhichStartedOn_isConsumedByPawnOnTheBoard[1][j + i].Not(),
+            pawnWhichStartedOn_isPaired[other_direction][0][j].Not(),
+            pawnWhichStartedOn_isPaired[other_direction][1][j + i].Not()};
+        cp.model.AddBoolAnd(literals).OnlyEnforceIf(
+            pawnWhichStartedOn_isPaired[d][0][j]);
+      }
+      d = 1;
+      other_direction = 0;
+    }
 
-    // Potential TODO:
-    // if we need, we can resort to checking promotions
-    //
-    // matched, sweeped, promoted, just captured (nothing beneficial)
-    // if matched or sweeped, can't be promoted
-    // intvar with domain [0, 2]. 1->left, 2->right
+    std::vector<std::vector<BoolVar>> freePromotions(NUM_SIDES);
+    for (int i = 0; i < NUM_SIDES; i++) {
+      int opp = (i + 1) % NUM_SIDES;
+      for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
+        BoolVar opp_never_left_file = cp_model.NewBoolVar();
+        cp_model.Add(pawnVar[opp][j] == j).OnlyEnforceIf(opp_never_left_file);
+        BoolVar literals[] = {
+            matchedStartingSquare[i][j].Not(),
+            pawnWhichStartedOn_isConsumedByPawnOnTheBoard[i][j].Not(),
+            pawnWhichStartedOn_isPaired[0][i][j].Not(),
+            pawnWhichStartedOn_isPaired[1][i][j].Not(),
+            opp_never_left_file.Not()};
+        cp_model.AddBoolAnd(literals).OnlyEnforceIf(freePromotions[i][j]);
+      }
+    }
 
+    cp_model.AddImplication();
     cp_model.AddAllDifferent(pawnVars[i]);
     cp_model.AddLessOrEqual(LinearExpr::Sum(pawnCosts[i]),
                             NUM_CAPTURABLE_CHESSMEN_PSIDE -

@@ -11,6 +11,8 @@
 #include "tree_search.h"
 #include "util.h"
 
+// TODO: our binomials[64][8] is wrong I think
+
 #define TEN_THOUSAND 10000
 
 void compute_binomials() {
