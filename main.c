@@ -78,29 +78,18 @@ int main(int argc, char **argv) {
 
     checking_info ci = validate_checks(p);
     if (ci.code != 0) {
-      // if (ci.code == OBTUSE_ASPECTS) {
-      //  printf("OBTUSE_ASPECTS follows:\n");
-      //  print_fen(p);
-      //}
       continue;
     }
 
-    slack bas = bishop_affected_promotion_slack(p);
-    if (bas.pawn_slack[0] < 0 || bas.pawn_slack[1] < 0 ||
-        bas.chessmen_slack[0] < 0 || bas.chessmen_slack[1] < 0) {
+    promo_info pi = bishop_affected_promotion_info(p);
+    if (pi.slack.pawn_slack[0] < 0 || pi.slack.pawn_slack[1] < 0 ||
+        pi.slack.chessmen_slack[0] < 0 || pi.slack.chessmen_slack[1] < 0) {
       continue;
     }
 
     uint64_t pawns[] = {p.sides[0].pawns, p.sides[1].pawns};
-    int proms[2] = {0};
-    int num_capturable_chessmen[2];
-    for (int i = 0; i < NUM_SIDES; i++) {
-      num_capturable_chessmen[i] = _mm_popcnt_u64(p.sides[i].pawns);
-      for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
-        num_capturable_chessmen[i] += _mm_popcnt_u64(p.sides[i].pieces[j]);
-      }
-    }
-    if (!FilterPawn(pawns, p.enpassant, num_capturable_chessmen, proms)) {
+    if (!FilterPawn(pawns, p.enpassant, pi.total_captured_base_pieces,
+                    pi.promotions)) {
       continue;
     }
 

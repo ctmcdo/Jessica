@@ -4,7 +4,13 @@
 #define WHITE_SQ_MASK 0xAA55AA55AA55AA55
 #define BLACK_SQ_MASK 0x55AA55AA55AA55AA
 
-slack bishop_affected_promotion_slack(position p) {
+typedef struct promo_info {
+  int promotions[NUM_SIDES];
+  slack slack;
+  int total_captured_base_pieces[NUM_SIDES];
+} promo_info;
+
+promo_info bishop_affected_promotion_info(position p) {
   int num_pawns[NUM_SIDES];
   int num_base;
   int promotions[NUM_SIDES] = {0};
@@ -30,5 +36,13 @@ slack bishop_affected_promotion_slack(position p) {
     }
   }
 
-  return promotion_slack(num_pawns, total_base_capturable_pieces, promotions);
+  promo_info pi;
+  for (int i = 0; i < NUM_SIDES; i++) {
+    pi.promotions[i] = promotions[i];
+    pi.total_captured_base_pieces[i] =
+        NUM_BASE_CAPTURABLE_PIECES_PSIDE - total_base_capturable_pieces[i];
+    pi.slack =
+        promotion_slack(num_pawns, total_base_capturable_pieces, promotions);
+  }
+  return pi;
 }
