@@ -133,11 +133,6 @@ int pass_generic(position_node **root, mpz_t index, uint64_t *occupied_squares,
   return num_chessmen;
 }
 
-// (row, column) to bitboard
-uint64_t rcb(int row, int col) {
-  return 1UL << ((row * BOARD_SIDE_LENGTH) + col);
-}
-
 int pass_fixed_rooks_and_kings(position_node **root, mpz_t index, position *p,
                                uint64_t *occupied_squares, bool side) {
   mpz_t rem;
@@ -265,8 +260,8 @@ position retrieve_position(position_node *root, mpz_t index) {
   }
   occupied_squares -= EDGE_ROW_MASK;
   int nfr[NUM_SIDES];
-  nfr[0] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 1);
-  nfr[1] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 0);
+  nfr[0] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 0);
+  nfr[1] = pass_fixed_rooks_and_kings(&root, index, &p, &occupied_squares, 1);
   if (!p.enpassant && equal_num_pawns && (nfr[0] != nfr[1])) {
     mpz_fdiv_qr_ui(index, rem, index, 2);
     if (mpz_get_ui(rem)) {
@@ -293,17 +288,6 @@ position retrieve_position(position_node *root, mpz_t index) {
     }
   }
 
-  int num_pawns[NUM_SIDES];
-  int total_base_capturable_pieces[NUM_SIDES];
-  for (int i = 0; i < NUM_SIDES; i++) {
-    num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
-
-    total_base_capturable_pieces[i] = nfr[i];
-    for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
-      total_base_capturable_pieces[i] += covered_sets[i][j];
-    }
-  }
-
   for (int i = 0; i < NUM_SIDES; i++) {
     if (nfr[i] == NO_CASTLING_RIGHTS) {
       int num_free_squares = NUM_SQUARES - _mm_popcnt_u64(occupied_squares);
@@ -316,6 +300,17 @@ position retrieve_position(position_node *root, mpz_t index) {
     }
   }
   mpz_clear(rem);
+
+  int num_pawns[NUM_SIDES];
+  int total_base_capturable_pieces[NUM_SIDES];
+  for (int i = 0; i < NUM_SIDES; i++) {
+    num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
+
+    total_base_capturable_pieces[i] = nfr[i];
+    for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
+      total_base_capturable_pieces[i] += covered_sets[i][j];
+    }
+  }
 
   int coveredSet_indices[NUM_SIDES];
   int *cost_boundary_indices[NUM_SIDES];

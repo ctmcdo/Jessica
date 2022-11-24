@@ -55,7 +55,7 @@ void print_fen(position p) {
   printf(" ");
 
   char colour = 'w';
-  if (p.side0isBlack) {
+  if (p.side0isBlack == p.side0toMove) {
     colour = 'b';
   }
   printf("%c ", colour);

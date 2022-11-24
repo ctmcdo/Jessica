@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "chess.h"
+#include "util.h"
 
 // This isn't a filter but a sanity check. It should only
 // fail if there's a bug in the creation / searching of the

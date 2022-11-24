@@ -28,7 +28,7 @@ slack promotion_slack(int pawns[NUM_SIDES],
     s.chessmen_slack[i] =
         2 * (NUM_PAWNS_PSIDE - pawns[opp] - promotions[opp]) +
         (NUM_BASE_CAPTURABLE_PIECES_PSIDE - total_base_capturable_pieces[opp]) +
-        (NUM_CHESSMEN_PSIDE_LESS_KING - total_chessmen[i]) - promotions[i];
+        (NUM_CAPTURABLE_CHESSMEN_PSIDE - total_chessmen[i]) - promotions[i];
   }
   return s;
 }
