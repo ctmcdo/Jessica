@@ -11,11 +11,12 @@
 #include "tree_search.h"
 #include "util.h"
 
-// TODO: our binomials[64][8] is wrong I think
-
 #define TEN_THOUSAND 10000
 
 void compute_binomials() {
+  for (int k = 0; k <= MAX_BISHOPS_PSIDE; k++) {
+    binomials[0][k] = 0; 
+  }
   for (int n = 0; n <= NUM_SQUARES; n++) {
     binomials[n][0] = 1;
   }
@@ -149,6 +150,8 @@ int main(int argc, char **argv) {
   mpf_init(pbound);
   mpf_set(pbound, sample_space_size);
   mpf_mul(pbound, pbound, p_hat);
+  
+  printf("binomials[64][8]: %" PRIu64 "\n", binomials[64][8]);
 
   gmp_printf(
       "Probabilistic upperbound using 95%% C.I. on the number of positions "
