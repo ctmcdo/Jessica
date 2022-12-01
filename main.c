@@ -150,8 +150,6 @@ int main(int argc, char **argv) {
   mpf_init(pbound);
   mpf_set(pbound, sample_space_size);
   mpf_mul(pbound, pbound, p_hat);
-  
-  printf("binomials[64][8]: %" PRIu64 "\n", binomials[64][8]);
 
   gmp_printf(
       "Probabilistic upperbound using 95%% C.I. on the number of positions "
