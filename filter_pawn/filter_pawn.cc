@@ -55,7 +55,9 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     }
   }
 
+  vector<BoolVar> fileMatchOptions[NUM_SIDES][BOARD_SIDE_LENGTH];
   vector<BoolVar> fileMatchOptionsNegated[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> fileCoverOptions[NUM_SIDES][BOARD_SIDE_LENGTH];
   vector<BoolVar> fileCoverOptionsNegated[NUM_SIDES][BOARD_SIDE_LENGTH];
 
   uint64_t pawns[] = {_pawns[0], _pawns[1]};
@@ -86,15 +88,16 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
         for (int k = start; k < col; k++) {
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
-          cp_model.AddNotEqual(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
-          cp_model.AddImplication(pIsMatchedToK, matchedStartingSquares[i][k]);
+          cp_model.AddNotEqual(pawnVars[i][p], k)
+              .OnlyEnforceIf(pIsMatchedToK.Not());
+          fileMatchOptions[i][k].push_back(pIsMatchedToK);
           fileMatchOptionsNegated[i][k].push_back(pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
           cp_model.AddLessOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
           cp_model.AddGreaterThan(pawnVars[i][p], k)
               .OnlyEnforceIf(pCoversK.Not());
-          cp_model.AddImplication(pCoversK, startingSquareIsCovered[opp][k]);
+          fileCoverOptions[i][k].push_back(pCoversK);
           fileCoverOptionsNegated[i][k].push_back(pCoversK.Not());
         }
 
@@ -103,23 +106,22 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
             .OnlyEnforceIf(pIsMatchedToFile);
         cp_model.AddNotEqual(pawnVars[i][p], col)
             .OnlyEnforceIf(pIsMatchedToFile.Not());
-        cp_model.AddImplication(pIsMatchedToFile,
-                                matchedStartingSquares[i][col]);
-        cp_model.AddImplication(pIsMatchedToFile,
-                                matchedToSameFileAsPawn[i][col]);
-        fileMatchOptionsNegated[i][col].push_back(pIsMatchedToFile);
+        cp_model.AddEquality(pIsMatchedToFile, matchedToSameFileAsPawn[i][col]);
+        fileMatchOptions[i][col].push_back(pIsMatchedToFile);
+        fileMatchOptionsNegated[i][col].push_back(pIsMatchedToFile.Not());
 
         for (int k = col + 1; k <= end; k++) {
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
-          cp_model.AddNotEqual(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
-          cp_model.AddImplication(pIsMatchedToK, matchedStartingSquares[i][k]);
+          cp_model.AddNotEqual(pawnVars[i][p], k)
+              .OnlyEnforceIf(pIsMatchedToK.Not());
+          fileMatchOptions[i][k].push_back(pIsMatchedToK);
           fileMatchOptionsNegated[i][k].push_back(pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
           cp_model.AddGreaterOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
           cp_model.AddLessThan(pawnVars[i][p], k).OnlyEnforceIf(pCoversK.Not());
-          cp_model.AddImplication(pCoversK, startingSquareIsCovered[opp][k]);
+          fileCoverOptions[i][k].push_back(pCoversK);
           fileCoverOptionsNegated[i][k].push_back(pCoversK.Not());
         }
 
@@ -132,9 +134,13 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
 
   for (int i = 0; i < NUM_SIDES; i++) {
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
+      cp_model.AddBoolOr(fileMatchOptions[i][j])
+          .OnlyEnforceIf(matchedStartingSquares[i][j]);
       cp_model.AddBoolAnd(fileMatchOptionsNegated[i][j])
           .OnlyEnforceIf(matchedStartingSquares[i][j].Not());
 
+      cp_model.AddBoolOr(fileCoverOptions[i][j])
+          .OnlyEnforceIf(startingSquareIsCovered[i][j]);
       cp_model.AddBoolAnd(fileCoverOptionsNegated[i][j])
           .OnlyEnforceIf(startingSquareIsCovered[i][j].Not());
     }
@@ -226,6 +232,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     }
   }
 
+  // TODO: account for pairsGoTo
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
 
