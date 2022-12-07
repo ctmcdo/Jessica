@@ -31,6 +31,8 @@ const Domain SINGLE_PAWN_DISPLACEMENT_DOMAIN(-SQUARES_ON_PAWN_FILE + 1,
                                              SQUARES_ON_PAWN_FILE -
                                                  1); // less starting file
 const Domain ZERO_DOMAIN(0, 0);
+const Domain NUM_CAPT_DOMAIN(0, NUM_CAPTURABLE_CHESSMEN_PSIDE);
+const Domain PROMOTIONS_DOMAIN(-BOARD_SIDE_LENGTH, BOARD_SIDE_LENGTH);
 
 extern "C" {
 int get_row_num(int n) { return (n / BOARD_SIDE_LENGTH); }
@@ -154,7 +156,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
 
   BoolVar pawnWhichStartedOn_isConsumedByPawnOnBoard[NUM_SIDES]
                                                     [BOARD_SIDE_LENGTH];
-  IntVar consumedSum[NUM_SIDES];
+  IntVar numConsumed[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
@@ -164,9 +166,9 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       cp_model.AddBoolAnd(literals).OnlyEnforceIf(
           pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j]);
     }
-    consumedSum[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
+    numConsumed[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
     cp_model.AddEquality(
-        consumedSum[i],
+        numConsumed[i],
         LinearExpr::Sum(pawnWhichStartedOn_isConsumedByPawnOnBoard[i]));
   }
 
@@ -212,7 +214,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
   cp_model.AddLessOrEqual(pairsGoTo[0], num_pairs);
   cp_model.AddEquality(pairsGoTo[1], num_pairs - pairsGoTo[0]);
 
-  IntVar sameFilePromSum[NUM_SIDES];
+  IntVar numSameFilePromotions[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
@@ -226,8 +228,8 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       };
       cp_model.AddBoolAnd(literals).OnlyEnforceIf(sameFilePromotions[i][j]);
     }
-    sameFilePromSum[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
-    cp_model.AddEquality(sameFilePromSum[i],
+    numSameFilePromotions[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
+    cp_model.AddEquality(numSameFilePromotions[i],
                          LinearExpr::Sum(sameFilePromotions[i]));
   }
 
@@ -235,6 +237,8 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
   IntVar numCapturedPiecePromotions[NUM_SIDES];
   IntVar numCapturedBasePiecePromotions[NUM_SIDES];
   IntVar numCapturedPromotionPromotions[NUM_SIDES];
+  BoolVar sideBorrowed[NUM_SIDES] = {cp_model.NewBoolVar(),
+                                     cp_model.NewBoolVar()};
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
@@ -264,33 +268,45 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     cp_model.AddEquality(numCapturedPiecePromotions[i],
                          numCapturedBasePiecePromotions[i] +
                              numCapturedPromotionPromotions[i]);
-  }
 
+    cp_model.AddGreaterThan(numCapturedPromotionPromotions[i], 0)
+        .OnlyEnforceIf(sideBorrowed[i]);
+    cp_model.AddEquality(numCapturedPromotionPromotions[i], 0)
+        .OnlyEnforceIf(sideBorrowed[i].Not());
+
+    cp_model.AddLessOrEqual(numCapturedPromotionPromotions[i],
+                            numSameFilePromotions[opp] +
+                                numCapturedBasePiecePromotions[opp]);
+  }
+  cp_model.AddNotEqual(sideBorrowed[0], sideBorrowed[1]);
+
+  IntVar promotionSurplus[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
+    promotionSurplus[i] = cp_model.NewIntVar(PROMOTIONS_DOMAIN);
+    cp_model.AddEquality(promotionSurplus[i],
+                         pairsGoTo[i] + numCapturedPiecePromotions[i] +
+                             numSameFilePromotions[i] -
+                             numCapturedPromotionPromotions[opp] -
+                             minPromotionsToAccountFor[i]);
+    cp_model.AddGreaterOrEqual(promotionSurplus[i], 0);
 
-    IntVar totalPawnsThatCouldHavePromoted =
-        cp_model.NewIntVar(BOARD_SIDE_LENGTH);
-    cp_model.AddEquality(totalPawnsThatCouldHavePromoted,
-                         sameFilePromSum + capturedBasePromSum + pairsGoTo[i]);
-    cp_model.AddGreaterOrEqual(totalPawnsThatCouldHavePromoted,
-                               minPromotionsToAccountFor[i]);
-    IntVar oppTotalPawnsThatCouldHavePromoted =
-        cp_mode.NewIntVar(BOARD_SIDE_LENGTH);
-    cp_model.AddEquality(oppTotalPawnsThatCouldHavePromoted,
-                         sameFilePromSum[opp] + capturedBasePromSum[opp] +
-                             pairsGoTo[i]);
-    IntVar promotionsThatWouldThenHaveBeenCaptured =
-        cp_model.NewIntVar(BOARD_SIDE_LENGTH);
-    cp_model.AddEquality(promotionsThatWouldThenHaveBeenCaptured,
-                         totalPawnsThatCouldHavePromoted -
-                             minPromotionsToAccountFor[opp]);
+    cp_model.AddLessOrEqual(numCapturedPromotionPromotions[i],
+                            promotionSurplus[i]);
+  }
 
-    cp_model.AddLessOrEqual(pcSum, consumedSum + totalPawnsThatPromoted -
-                                       minPromotionsToAccountFor[i]);
-
-    // cp_model.AddLessOrEqual(pcSum + capturedBasePromSum - consumedSum,
-    //                       capturedBasePieces[opp]);
+  IntVar numPiecesPotentiallyCapturedForPawnDiagram[NUM_SIDES];
+  for (int i = 0; i < NUM_SIDES; i++) {
+    int opp = (i + 1) % NUM_SIDES;
+    numPiecesPotentiallyCapturedForPawnDiagram[i] =
+        cp_model.NewIntVar(NUM_CAPT_DOMAIN);
+    cp_model.AddEquality(
+        numPiecesPotentiallyCapturedForPawnDiagram[i],
+        (capturedBasePieces[opp] - numCapturedBasePiecePromotions[opp]) +
+            (promotionSurplus[i] - numCapturedPromotionPromotions[i]));
+    cp_model.AddGreaterOrEqual(
+        numConsumed[i] + numPiecesPotentiallyCapturedForPawnDiagram[i],
+        pawnCostSum[i]);
   }
 
   const CpSolverResponse response = Solve(cp_model.Build());
