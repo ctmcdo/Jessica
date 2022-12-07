@@ -290,9 +290,6 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
                              numCapturedPromotionPromotions[opp] -
                              minPromotionsToAccountFor[i]);
     cp_model.AddGreaterOrEqual(promotionSurplus[i], 0);
-
-    cp_model.AddLessOrEqual(numCapturedPromotionPromotions[i],
-                            promotionSurplus[i]);
   }
 
   IntVar numPiecesPotentiallyCapturedForPawnDiagram[NUM_SIDES];
