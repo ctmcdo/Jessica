@@ -157,16 +157,16 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     }
   }
 
-  BoolVar pawnWhichStartedOn_isConsumedByPawnOnBoard[NUM_SIDES]
-                                                    [BOARD_SIDE_LENGTH];
-  IntVar numConsumed[NUM_SIDES];
+  // todo: init with the domains instead of in loops
+  BoolVar pawnConsumedPawnWhichStartedOn[NUM_SIDES][BOARD_SIDE_LENGTH];
+  IntVar numPawnsConsumedByPawns[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
-      BoolVar literals[] = {matchedStartingSquares[i][j].Not(),
+      BoolVar consumedLiterals[] = {matchedStartingSquares[i][j].Not(),
                             coveredStartingSquares[i][j]};
       pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j] = cp_model.NewBoolVar();
-      cp_model.AddBoolAnd(literals).OnlyEnforceIf(
+      cp_model.AddBoolAnd(consumedLiterals).OnlyEnforceIf(
           pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j]);
     }
     numConsumed[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
@@ -183,11 +183,11 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       }
     }
   }
-  int d = 0;
-  int other_direction = 1;
-  int col_lim = BOARD_SIDE_LENGTH;
+  int d = 1;
+  int other_direction = 0;
+  int file_lim = BOARD_SIDE_LENGTH;
   for (int i = -1; i <= 1; i += 2) {
-    for (int j = 1; j < col_lim; j++) {
+    for (int j = d; j < col_lim; j++) {
       cp_model.AddEquality(pawnWhichStartedOn_isPaired[d][0][j],
                            pawnWhichStartedOn_isPaired[d][1][j + i]);
       BoolVar literals[] = {
@@ -200,8 +200,8 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       cp_model.AddBoolAnd(literals).OnlyEnforceIf(
           pawnWhichStartedOn_isPaired[d][0][j]);
     }
-    d = 1;
-    other_direction = 0;
+    d = 0;
+    other_direction = 1;
     col_lim = BOARD_SIDE_LENGTH - 1;
   }
   IntVar num_pairs_dir0 = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
