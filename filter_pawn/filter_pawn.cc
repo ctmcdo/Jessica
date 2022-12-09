@@ -31,7 +31,7 @@ const Domain
 const Domain COST_DOMAIN(0, MAX_COST_PSIDE);
 const Domain PROMOTIONS_DOMAIN(-BOARD_SIDE_LENGTH, BOARD_SIDE_LENGTH);
 const Domain
-    SINGLE_PAWN_COST_DOMAIN(-NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE + 1,
+    PAWN_RELATIVE_RANGE_DOMAIN(-NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE + 1,
                             NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE -
                                 1); // their magnitude less 1 to account
                                     // for the file they're currently on
