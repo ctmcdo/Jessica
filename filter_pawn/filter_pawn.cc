@@ -17,22 +17,25 @@
 using namespace std;
 
 #define BOARD_SIDE_LENGTH 8
-#define MAX_PAWN_COST_SUM 25
-#define SQUARES_ON_PAWN_FILE (BOARD_SIDE_LENGTH - 2)
+#define MAX_COST_PSIDE 25
 #define NUM_CAPTURABLE_CHESSMEN_PSIDE 15
 #define NUM_SQUARES (BOARD_SIDE_LENGTH * BOARD_SIDE_LENGTH)
+#define NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE (BOARD_SIDE_LENGTH - 2)
 
 namespace operations_research {
 namespace sat {
 
 const Domain BOARD_SIDE_LENGTH_DOMAIN(0, BOARD_SIDE_LENGTH);
-const Domain PAWN_COST_SUM_DOMAIN(0, MAX_PAWN_COST_SUM);
-const Domain SINGLE_PAWN_DISPLACEMENT_DOMAIN(-SQUARES_ON_PAWN_FILE + 1,
-                                             SQUARES_ON_PAWN_FILE -
-                                                 1); // less starting file
-const Domain ZERO_DOMAIN(0, 0);
-const Domain NUM_CAPT_DOMAIN(0, NUM_CAPTURABLE_CHESSMEN_PSIDE);
+const Domain
+    NUM_CAPTURABLE_CHESSMEN_PSIDE_DOMAIN(0, NUM_CAPTURABLE_CHESSMEN_PSIDE);
+const Domain COST_DOMAIN(0, MAX_COST_PSIDE);
 const Domain PROMOTIONS_DOMAIN(-BOARD_SIDE_LENGTH, BOARD_SIDE_LENGTH);
+const Domain
+    SINGLE_PAWN_COST_DOMAIN(-NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE + 1,
+                            NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE -
+                                1); // their magnitude less 1 to account
+                                    // for the file they're currently on
+const Domain ZERO_DOMAIN(0, 0);
 
 extern "C" {
 int get_row_num(int n) { return (n / BOARD_SIDE_LENGTH); }
@@ -40,26 +43,26 @@ int get_col_num(int n) { return (n % BOARD_SIDE_LENGTH); }
 }
 
 extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
-                           int capturedBasePieces[NUM_SIDES],
-                           int minPromotionsToAccountFor[NUM_SIDES]) {
+                           int numCapturedBasePieces[NUM_SIDES],
+                           int minPromotions[NUM_SIDES]) {
   CpModelBuilder cp_model;
   BoolVar matchedStartingSquares[NUM_SIDES][BOARD_SIDE_LENGTH];
-  BoolVar startingSquareIsCovered[NUM_SIDES][BOARD_SIDE_LENGTH];
-  BoolVar matchedToSameFileAsPawn[NUM_SIDES][BOARD_SIDE_LENGTH];
-  BoolVar sameFilePromotions[NUM_SIDES][BOARD_SIDE_LENGTH];
+  BoolVar coveredStartingSquares[NUM_SIDES][BOARD_SIDE_LENGTH];
+  BoolVar fileSamePawnFileMatches[NUM_SIDES][BOARD_SIDE_LENGTH];
+  BoolVar zeroCostPromotions[NUM_SIDES][BOARD_SIDE_LENGTH];
   for (int i = 0; i < NUM_SIDES; i++) {
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
       matchedStartingSquares[i][j] = cp_model.NewBoolVar();
-      startingSquareIsCovered[i][j] = cp_model.NewBoolVar();
-      matchedToSameFileAsPawn[i][j] = cp_model.NewBoolVar();
-      sameFilePromotions[i][j] = cp_model.NewBoolVar();
+      coveredStartingSquares[i][j] = cp_model.NewBoolVar();
+      fileSamePawnFileMatches[i][j] = cp_model.NewBoolVar();
+      zeroCostPromotions[i][j] = cp_model.NewBoolVar();
     }
   }
 
-  vector<BoolVar> fileMatchOptions[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> fileMatchOptionsNegated[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> fileCoverOptions[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> fileCoverOptionsNegated[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> pawnVarMatchesFile[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> pawnVarDoesNotMatchFile[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> pawnVarCoversFile[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> pawnVarDoesNotCoverFile[NUM_SIDES][BOARD_SIDE_LENGTH];
 
   vector<IntVar> pawnVars[NUM_SIDES];
   vector<IntVar> pawnCosts[NUM_SIDES];
@@ -79,9 +82,9 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       if (i == 0 && enpassant == (1UL << tz)) {
         const Domain single_col_domain(col, col);
         pawnVars[i].push_back(cp_model.NewIntVar(single_col_domain));
-        pawnCosts[i].push_back(cp_model.NewIntVar(ZERO_DOMAIN));
         cp_model.FixVariable(matchedStartingSquares[i][col], true);
-        cp_model.FixVariable(matchedToSameFileAsPawn[i][col], true);
+        cp_model.FixVariable(fileSamePawnFileMatches[i][col], true);
+        pawnCosts[i].push_back(cp_model.NewIntVar(ZERO_DOMAIN));
 
       } else {
         int row = get_row_num(tz);
@@ -90,19 +93,20 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
         const Domain d(start, end);
         pawnVars[i].push_back(cp_model.NewIntVar(d));
         for (int k = start; k < col; k++) {
+          // TODO: try make this into a function
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
           cp_model.AddNotEqual(pawnVars[i][p], k)
               .OnlyEnforceIf(pIsMatchedToK.Not());
-          fileMatchOptions[i][k].push_back(pIsMatchedToK);
-          fileMatchOptionsNegated[i][k].push_back(pIsMatchedToK.Not());
+          pawnVarMatchesFile[i][k].push_back(pIsMatchedToK);
+          pawnVarDoesNotMatchFile[i][k].push_back(pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
           cp_model.AddLessOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
           cp_model.AddGreaterThan(pawnVars[i][p], k)
               .OnlyEnforceIf(pCoversK.Not());
-          fileCoverOptions[i][k].push_back(pCoversK);
-          fileCoverOptionsNegated[i][k].push_back(pCoversK.Not());
+          pawnVarCoversFile[i][k].push_back(pCoversK);
+          pawnVarDoesNotCoverFile[i][k].push_back(pCoversK.Not());
         }
 
         BoolVar pIsMatchedToFile = cp_model.NewBoolVar();
@@ -110,47 +114,46 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
             .OnlyEnforceIf(pIsMatchedToFile);
         cp_model.AddNotEqual(pawnVars[i][p], col)
             .OnlyEnforceIf(pIsMatchedToFile.Not());
-        cp_model.AddEquality(pIsMatchedToFile, matchedToSameFileAsPawn[i][col]);
-        fileMatchOptions[i][col].push_back(pIsMatchedToFile);
-        fileMatchOptionsNegated[i][col].push_back(pIsMatchedToFile.Not());
+        cp_model.AddEquality(pIsMatchedToFile, fileSamePawnFileMatches[i][col]);
+        pawnVarMatchesFile[i][col].push_back(pIsMatchedToFile);
+        pawnVarDoesNotMatchFile[i][col].push_back(pIsMatchedToFile.Not());
 
         for (int k = col + 1; k <= end; k++) {
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
           cp_model.AddNotEqual(pawnVars[i][p], k)
               .OnlyEnforceIf(pIsMatchedToK.Not());
-          fileMatchOptions[i][k].push_back(pIsMatchedToK);
-          fileMatchOptionsNegated[i][k].push_back(pIsMatchedToK.Not());
+          pawnVarMatchesFile[i][k].push_back(pIsMatchedToK);
+          pawnVarDoesNotMatchFile[i][k].push_back(pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
           cp_model.AddGreaterOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
           cp_model.AddLessThan(pawnVars[i][p], k).OnlyEnforceIf(pCoversK.Not());
-          fileCoverOptions[i][k].push_back(pCoversK);
-          fileCoverOptionsNegated[i][k].push_back(pCoversK.Not());
+          pawnVarCoversFile[i][k].push_back(pCoversK);
+          pawnVarDoesNotCoverFile[i][k].push_back(pCoversK.Not());
         }
 
-        pawnCosts[i].push_back(
-            cp_model.NewIntVar(SINGLE_PAWN_DISPLACEMENT_DOMAIN));
+        pawnCosts[i].push_back(cp_model.NewIntVar(SINGLE_PAWN_COST_DOMAIN));
         cp_model.AddAbsEquality(pawnCosts[i][p], pawnVars[i][p] - p);
       }
     }
     cp_model.AddAllDifferent(pawnVars[i]);
 
-    pawnCostSum[i] = cp_model.NewIntVar(PAWN_COST_SUM_DOMAIN);
+    pawnCostSum[i] = cp_model.NewIntVar(COST_DOMAIN);
     cp_model.AddEquality(pawnCostSum[i], LinearExpr::Sum(pawnCosts[i]));
   }
 
   for (int i = 0; i < NUM_SIDES; i++) {
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
-      cp_model.AddBoolOr(fileMatchOptions[i][j])
+      cp_model.AddBoolOr(pawnVarMatchesFile[i][j])
           .OnlyEnforceIf(matchedStartingSquares[i][j]);
-      cp_model.AddBoolAnd(fileMatchOptionsNegated[i][j])
+      cp_model.AddBoolAnd(pawnVarDoesNotMatchFile[i][j])
           .OnlyEnforceIf(matchedStartingSquares[i][j].Not());
 
-      cp_model.AddBoolOr(fileCoverOptions[i][j])
-          .OnlyEnforceIf(startingSquareIsCovered[i][j]);
-      cp_model.AddBoolAnd(fileCoverOptionsNegated[i][j])
-          .OnlyEnforceIf(startingSquareIsCovered[i][j].Not());
+      cp_model.AddBoolOr(pawnVarCoversFile[i][j])
+          .OnlyEnforceIf(coveredStartingSquares[i][j]);
+      cp_model.AddBoolAnd(pawnVarDoesNotCoverFile[i][j])
+          .OnlyEnforceIf(coveredStartingSquares[i][j].Not());
     }
   }
 
@@ -161,7 +164,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
       BoolVar literals[] = {matchedStartingSquares[i][j].Not(),
-                            startingSquareIsCovered[i][j]};
+                            coveredStartingSquares[i][j]};
       pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j] = cp_model.NewBoolVar();
       cp_model.AddBoolAnd(literals).OnlyEnforceIf(
           pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j]);
@@ -223,14 +226,14 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
           pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j].Not(),
           pawnWhichStartedOn_isPaired[0][i][j].Not(),
           pawnWhichStartedOn_isPaired[1][i][j].Not(),
-          matchedToSameFileAsPawn[opp][j].Not(),
-          sameFilePromotions[opp][j].Not(),
+          fileSamePawnFileMatches[opp][j].Not(),
+          zeroCostPromotions[opp][j].Not(),
       };
-      cp_model.AddBoolAnd(literals).OnlyEnforceIf(sameFilePromotions[i][j]);
+      cp_model.AddBoolAnd(literals).OnlyEnforceIf(zeroCostPromotions[i][j]);
     }
     numSameFilePromotions[i] = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
     cp_model.AddEquality(numSameFilePromotions[i],
-                         LinearExpr::Sum(sameFilePromotions[i]));
+                         LinearExpr::Sum(zeroCostPromotions[i]));
   }
 
   BoolVar capturedPiecePromotions[NUM_SIDES][BOARD_SIDE_LENGTH];
@@ -247,7 +250,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
           pawnWhichStartedOn_isConsumedByPawnOnBoard[i][j].Not(),
           pawnWhichStartedOn_isPaired[0][i][j].Not(),
           pawnWhichStartedOn_isPaired[1][i][j].Not(),
-          sameFilePromotions[i][j].Not(),
+          zeroCostPromotions[i][j].Not(),
       };
       capturedPiecePromotions[i][j] = cp_model.NewBoolVar();
       cp_model.AddBoolAnd(literals).OnlyEnforceIf(
@@ -262,7 +265,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     numCapturedBasePiecePromotions[i] =
         cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
     cp_model.AddLessOrEqual(numCapturedBasePiecePromotions[i],
-                            capturedBasePieces[opp]);
+                            numCapturedBasePieces[opp]);
     numCapturedPromotionPromotions[i] =
         cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
     cp_model.AddEquality(numCapturedPiecePromotions[i],
@@ -288,7 +291,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
                          pairsGoTo[i] + numCapturedPiecePromotions[i] +
                              numSameFilePromotions[i] -
                              numCapturedPromotionPromotions[opp] -
-                             minPromotionsToAccountFor[i]);
+                             minPromotions[i]);
     cp_model.AddGreaterOrEqual(promotionSurplus[i], 0);
   }
 
@@ -296,10 +299,10 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
   for (int i = 0; i < NUM_SIDES; i++) {
     int opp = (i + 1) % NUM_SIDES;
     numPiecesPotentiallyCapturedForPawnDiagram[i] =
-        cp_model.NewIntVar(NUM_CAPT_DOMAIN);
+        cp_model.NewIntVar(NUM_CAPTURABLE_CHESSMEN_PSIDE_DOMAIN);
     cp_model.AddEquality(
         numPiecesPotentiallyCapturedForPawnDiagram[i],
-        (capturedBasePieces[opp] - numCapturedBasePiecePromotions[opp]) +
+        (numCapturedBasePieces[opp] - numCapturedBasePiecePromotions[opp]) +
             (promotionSurplus[i] - numCapturedPromotionPromotions[i]));
     cp_model.AddGreaterOrEqual(
         numConsumed[i] + numPiecesPotentiallyCapturedForPawnDiagram[i],
