@@ -22,8 +22,8 @@ using namespace std;
 #define NUM_SQUARES (BOARD_SIDE_LENGTH * BOARD_SIDE_LENGTH)
 #define NUM_PAWN_OCCUPIABLE_SQUARES_PER_FILE (BOARD_SIDE_LENGTH - 2)
 
-#define BACKSLASH 1
-#define FORWARD_SLASH 0
+#define FORWARD_SLASH 1
+#define BACKSLASH 0
 
 namespace operations_research {
 namespace sat {
@@ -64,16 +64,28 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     }
   }
 
-  vector<BoolVar> pawnVarMatchesFile[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> pawnVarDoesNotMatchFile[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> pawnVarCoversFile[NUM_SIDES][BOARD_SIDE_LENGTH];
-  vector<BoolVar> pawnVarDoesNotCoverFile[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> startingSquarePotentialMatches[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> startingSquarePotentialMatchesNegated[NUM_SIDES]
+                                                       [BOARD_SIDE_LENGTH];
+  vector<BoolVar> startingSquarePotentialSameFileMatches[NUM_SIDES]
+                                                        [BOARD_SIDE_LENGTH];
+  vector<BoolVar>
+      startingSquarePotentialSameFileMatchesNegated[NUM_SIDES]
+                                                   [BOARD_SIDE_LENGTH];
+  vector<BoolVar> startingSquareCoverLiterals[NUM_SIDES][BOARD_SIDE_LENGTH];
+  vector<BoolVar> startingSquareCoverLiteralsNegated[NUM_SIDES]
+                                                    [BOARD_SIDE_LENGTH];
 
   vector<IntVar> pawnVars[NUM_SIDES];
   vector<IntVar> pawnCosts[NUM_SIDES];
   IntVar pawnCostSum[NUM_SIDES];
   uint64_t pawns[] = {_pawns[0], _pawns[1]};
   for (int i = 0; i < NUM_SIDES; i++) {
+    if (pawns[i] == 0) {
+      pawnCostSum[i] = cp_model.NewIntVar(ZERO_DOMAIN);
+      continue;
+    }
+
     int opp = (i + 1) % NUM_SIDES;
     int num_pawns = _mm_popcnt_u64(pawns[i]);
     pawnVars[i].reserve(num_pawns);
@@ -84,35 +96,44 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       pawns[i] = __blsr_u64(pawns[i]);
 
       int col = get_col_num(tz);
-      if (i == 0 && enpassant == (1UL << tz)) {
+      if (enpassant == (1UL << tz)) {
         const Domain single_col_domain(col, col);
-        pawnVars[i].push_back(cp_model.NewIntVar(single_col_domain));
-        pawnVarMatchesFile[i][col].push_back(cp_model.TrueVar());
-        cp_model.FixVariable(matchedStartingSquares[i][col], true);
-        cp_model.FixVariable(fileSamePawnFileMatches[i][col], true);
-        pawnCosts[i].push_back(cp_model.NewIntVar(ZERO_DOMAIN));
+        pawnVars[0].push_back(cp_model.NewIntVar(single_col_domain));
+        startingSquarePotentialMatches[0][col].push_back(cp_model.TrueVar());
+        cp_model.FixVariable(matchedStartingSquares[0][col], true);
+        cp_model.FixVariable(fileSamePawnFileMatches[0][col], true);
+        pawnCosts[0].push_back(cp_model.NewIntVar(ZERO_DOMAIN));
 
       } else {
         int row = get_row_num(tz);
-        int start = std::max(col - row, 0);
-        int end = std::min(col + row, BOARD_SIDE_LENGTH - 1);
+        int start;
+        int end;
+        if (i == 0) {
+          start = std::max(col - (row - 1), 0);
+          end = std::min(col + (row - 1), BOARD_SIDE_LENGTH - 1);
+        } else {
+          start = std::max(col - ((BOARD_SIDE_LENGTH - 2) - row), 0);
+          end = std::min(col + ((BOARD_SIDE_LENGTH - 2) - row),
+                         BOARD_SIDE_LENGTH - 1);
+        }
         const Domain d(start, end);
         pawnVars[i].push_back(cp_model.NewIntVar(d));
         for (int k = start; k < col; k++) {
-          // TODO: try make this into a function
+          //  TODO: try make this into a function
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
           cp_model.AddNotEqual(pawnVars[i][p], k)
               .OnlyEnforceIf(pIsMatchedToK.Not());
-          pawnVarMatchesFile[i][k].push_back(pIsMatchedToK);
-          pawnVarDoesNotMatchFile[i][k].push_back(pIsMatchedToK.Not());
+          startingSquarePotentialMatches[i][k].push_back(pIsMatchedToK);
+          startingSquarePotentialMatchesNegated[i][k].push_back(
+              pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
-          cp_model.AddLessOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
-          cp_model.AddGreaterThan(pawnVars[i][p], k)
+          cp_model.AddLessThan(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
+          cp_model.AddGreaterOrEqual(pawnVars[i][p], k)
               .OnlyEnforceIf(pCoversK.Not());
-          pawnVarCoversFile[i][k].push_back(pCoversK);
-          pawnVarDoesNotCoverFile[i][k].push_back(pCoversK.Not());
+          startingSquareCoverLiterals[opp][k].push_back(pCoversK);
+          startingSquareCoverLiteralsNegated[opp][k].push_back(pCoversK.Not());
         }
 
         BoolVar pIsMatchedToFile = cp_model.NewBoolVar();
@@ -120,23 +141,33 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
             .OnlyEnforceIf(pIsMatchedToFile);
         cp_model.AddNotEqual(pawnVars[i][p], col)
             .OnlyEnforceIf(pIsMatchedToFile.Not());
-        cp_model.AddEquality(pIsMatchedToFile, fileSamePawnFileMatches[i][col]);
-        pawnVarMatchesFile[i][col].push_back(pIsMatchedToFile);
-        pawnVarDoesNotMatchFile[i][col].push_back(pIsMatchedToFile.Not());
+        startingSquarePotentialMatches[i][col].push_back(pIsMatchedToFile);
+        startingSquarePotentialMatchesNegated[i][col].push_back(
+            pIsMatchedToFile.Not());
+        startingSquarePotentialSameFileMatches[i][col].push_back(
+            pIsMatchedToFile);
+        startingSquarePotentialSameFileMatchesNegated[i][col].push_back(
+            pIsMatchedToFile.Not());
+
+        startingSquareCoverLiterals[opp][col].push_back(pIsMatchedToFile.Not());
+        startingSquareCoverLiteralsNegated[opp][col].push_back(
+            pIsMatchedToFile);
 
         for (int k = col + 1; k <= end; k++) {
           BoolVar pIsMatchedToK = cp_model.NewBoolVar();
           cp_model.AddEquality(pawnVars[i][p], k).OnlyEnforceIf(pIsMatchedToK);
           cp_model.AddNotEqual(pawnVars[i][p], k)
               .OnlyEnforceIf(pIsMatchedToK.Not());
-          pawnVarMatchesFile[i][k].push_back(pIsMatchedToK);
-          pawnVarDoesNotMatchFile[i][k].push_back(pIsMatchedToK.Not());
+          startingSquarePotentialMatches[i][k].push_back(pIsMatchedToK);
+          startingSquarePotentialMatchesNegated[i][k].push_back(
+              pIsMatchedToK.Not());
 
           BoolVar pCoversK = cp_model.NewBoolVar();
-          cp_model.AddGreaterOrEqual(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
-          cp_model.AddLessThan(pawnVars[i][p], k).OnlyEnforceIf(pCoversK.Not());
-          pawnVarCoversFile[i][k].push_back(pCoversK);
-          pawnVarDoesNotCoverFile[i][k].push_back(pCoversK.Not());
+          cp_model.AddGreaterThan(pawnVars[i][p], k).OnlyEnforceIf(pCoversK);
+          cp_model.AddLessOrEqual(pawnVars[i][p], k)
+              .OnlyEnforceIf(pCoversK.Not());
+          startingSquareCoverLiterals[opp][k].push_back(pCoversK);
+          startingSquareCoverLiteralsNegated[opp][k].push_back(pCoversK.Not());
         }
 
         pawnCosts[i].push_back(cp_model.NewIntVar(SINGLE_PAWN_COST_DOMAIN));
@@ -153,19 +184,28 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
       // I filed a bug related to this check in ortools:
       // https://github.com/google/or-tools/issues/3591
-      if (pawnVarMatchesFile[i][j].size() > 0) {
-        cp_model.AddBoolOr(pawnVarMatchesFile[i][j])
+      if (startingSquarePotentialMatches[i][j].size() > 0) {
+        cp_model.AddBoolOr(startingSquarePotentialMatches[i][j])
             .OnlyEnforceIf(matchedStartingSquares[i][j]);
-        cp_model.AddBoolAnd(pawnVarDoesNotMatchFile[i][j])
+        cp_model.AddBoolAnd(startingSquarePotentialMatchesNegated[i][j])
             .OnlyEnforceIf(matchedStartingSquares[i][j].Not());
       } else {
         cp_model.FixVariable(matchedStartingSquares[i][j], false);
       }
 
-      if (pawnVarCoversFile[i][j].size()) {
-        cp_model.AddBoolOr(pawnVarCoversFile[i][j])
+      if (startingSquarePotentialSameFileMatches[i][j].size() > 0) {
+        cp_model.AddBoolOr(startingSquarePotentialSameFileMatches[i][j])
+            .OnlyEnforceIf(fileSamePawnFileMatches[i][j]);
+        cp_model.AddBoolAnd(startingSquarePotentialSameFileMatchesNegated[i][j])
+            .OnlyEnforceIf(fileSamePawnFileMatches[i][j].Not());
+      } else {
+        cp_model.FixVariable(fileSamePawnFileMatches[i][j], false);
+      }
+
+      if (startingSquareCoverLiterals[i][j].size() > 0) {
+        cp_model.AddBoolOr(startingSquareCoverLiterals[i][j])
             .OnlyEnforceIf(coveredStartingSquares[i][j]);
-        cp_model.AddBoolAnd(pawnVarDoesNotCoverFile[i][j])
+        cp_model.AddBoolAnd(startingSquareCoverLiteralsNegated[i][j])
             .OnlyEnforceIf(coveredStartingSquares[i][j].Not());
       } else {
         cp_model.FixVariable(coveredStartingSquares[i][j], false);
@@ -174,19 +214,18 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
   }
 
   BoolVar pawnConsumedPawnWhichStartedOn[NUM_SIDES][BOARD_SIDE_LENGTH];
-  IntVar numPawnsConsumedByPawns[] = {
+  IntVar numPawnsConsumedByPawnsOnBoard[] = {
       cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN),
       cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN)};
   for (int i = 0; i < NUM_SIDES; i++) {
-    int opp = (i + 1) % NUM_SIDES;
     for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
       BoolVar notMatchedButCovered[] = {matchedStartingSquares[i][j].Not(),
-                                        coveredStartingSquares[opp][j]};
+                                        coveredStartingSquares[i][j]};
       pawnConsumedPawnWhichStartedOn[i][j] = cp_model.NewBoolVar();
       cp_model.AddBoolAnd(notMatchedButCovered)
           .OnlyEnforceIf(pawnConsumedPawnWhichStartedOn[i][j]);
     }
-    cp_model.AddEquality(numPawnsConsumedByPawns[i],
+    cp_model.AddEquality(numPawnsConsumedByPawnsOnBoard[i],
                          LinearExpr::Sum(pawnConsumedPawnWhichStartedOn[i]));
   }
 
@@ -198,18 +237,18 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       }
     }
   }
-  cp_model.FixVariable(pawnWhichStartedOn_isPaired[BACKSLASH][0][0], false);
   cp_model.FixVariable(
-      pawnWhichStartedOn_isPaired[BACKSLASH][1][BOARD_SIDE_LENGTH - 1], false);
+      pawnWhichStartedOn_isPaired[BACKSLASH][0][BOARD_SIDE_LENGTH - 1], false);
+  cp_model.FixVariable(pawnWhichStartedOn_isPaired[BACKSLASH][1][0], false);
 
+  cp_model.FixVariable(pawnWhichStartedOn_isPaired[FORWARD_SLASH][0][0], false);
   cp_model.FixVariable(
-      pawnWhichStartedOn_isPaired[FORWARD_SLASH][0][BOARD_SIDE_LENGTH - 1],
+      pawnWhichStartedOn_isPaired[FORWARD_SLASH][1][BOARD_SIDE_LENGTH - 1],
       false);
-  cp_model.FixVariable(pawnWhichStartedOn_isPaired[FORWARD_SLASH][1][0], false);
 
-  int d = 1;
+  int d = 1; // FORWARD_SLASH
   int file_lim = BOARD_SIDE_LENGTH;
-  int other_direction = 0;
+  int other_direction = BACKSLASH;
   for (int i = -1; i <= 1; i += 2) {
     for (int j = d; j < file_lim; j++) {
       cp_model.AddEquality(pawnWhichStartedOn_isPaired[d][0][j],
@@ -225,9 +264,9 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
       cp_model.AddBoolAnd(notMatchedNorConsumedNorPairedInOtherDirection)
           .OnlyEnforceIf(pawnWhichStartedOn_isPaired[d][0][j]);
     }
-    d = 0;
+    d = 0; // BACKSLASH
     file_lim = BOARD_SIDE_LENGTH - 1;
-    other_direction = 1;
+    other_direction = FORWARD_SLASH;
   }
   IntVar num_backslash_pairs = cp_model.NewIntVar(BOARD_SIDE_LENGTH_DOMAIN);
   cp_model.AddEquality(
@@ -309,8 +348,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
     cp_model.AddEquality(numPromsViaCapturedPromotion[i], 0)
         .OnlyEnforceIf(atLeastOnePromCapturedByPawn[i].Not());
   }
-  cp_model.AddNotEqual(atLeastOnePromCapturedByPawn[0],
-                       atLeastOnePromCapturedByPawn[1]);
+  cp_model.AddAtMostOne(atLeastOnePromCapturedByPawn);
 
   IntVar promsLeftForOppDiagram[NUM_SIDES];
   for (int i = 0; i < NUM_SIDES; i++) {
@@ -320,6 +358,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
         promsLeftForOppDiagram[i],
         pairsGoTo[i] + numZeroCostPromotions[i] + numPromsViaCapturedPiece[i] -
             numPromsViaCapturedPromotion[opp] - minPromotions[i]);
+    cp_model.Maximize(promsLeftForOppDiagram[i]);
     cp_model.AddGreaterOrEqual(promsLeftForOppDiagram[i], 0);
   }
 
@@ -332,7 +371,7 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
         (numCapturedBasePieces[opp] - numPromsViaCapturedBasePiece[i]) +
             promsLeftForOppDiagram[opp]);
 
-    cp_model.AddGreaterOrEqual(numPawnsConsumedByPawns[opp] +
+    cp_model.AddGreaterOrEqual(numPawnsConsumedByPawnsOnBoard[opp] +
                                    pawnDiagramPieceCaptureBudget,
                                pawnCostSum[i]);
   }
@@ -340,89 +379,140 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES], uint64_t enpassant,
   Model model;
   model.Add(NewFeasibleSolutionObserver([&](const CpSolverResponse &r) {
     /*
-    for (int i = 0; i < NUM_SIDES; i++) {
-      int opp = (i + 1) % NUM_SIDES;
-      printf("minPromotions[%d]: ", i);
-      cout << SolutionIntegerValue(r, minPromotions[i]) << endl;
-      printf("pawnCostSum[%d]: ", i);
-      cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
-      cout << endl;
+cout << "pawnVars\n";
+for (int i = 1; i >= 0; i--) {
+  if (pawnVars[i].size() == 0) {
+    printf("No pawns for side %d\n", i);
+    continue;
+  }
+  for (int j = 0; j < pawnVars[i].size(); j++) {
+    cout << SolutionIntegerValue(r, pawnVars[i][j]) << " ";
+  }
+  cout << "\n";
+}
+cout << "\n";
+cout << "pawnCosts\n";
+for (int i = 1; i >= 0; i--) {
+  if (pawnVars[i].size() == 0) {
+    printf("No pawns for side %d\n", i);
+    continue;
+  }
+  for (int j = 0; j < pawnCosts[i].size(); j++) {
+    cout << SolutionIntegerValue(r, pawnCosts[i][j]) << " ";
+  }
+  cout << "\n";
+}
 
-      printf("promsLeftForOppDiagram[%d]: ", i);
-      cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
-      printf("pairsGoTo[%d]: ", i);
-      cout << SolutionIntegerValue(r, pairsGoTo[i]) << endl;
-      printf("numZeroCostPromotions[%d]: ", i);
-      cout << SolutionIntegerValue(r, numZeroCostPromotions[i]) << endl;
-      printf("numPromsViaCapturedPiece[%d]: ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedPiece[i]) << endl;
-      cout << endl;
+/*
+cout << "pawnConsumedPawnWhichStartedOn:\n";
+for (int i = 1; i >= 0; i--) {
+for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+cout << SolutionIntegerValue(r, pawnConsumedPawnWhichStartedOn[i][j])
+     << " ";
+}
+cout << "\n";
+}
+cout << "\n";
 
-      printf("numCapturedBasePieces[%d]: ", opp);
-      cout << SolutionIntegerValue(r, numCapturedBasePieces[opp]) << endl;
-      printf("numPromsViaCapturedBasePiece[%d]:, ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) << endl;
-      printf("promsLeftForOppDiagram[%d]: ", opp);
-      cout << SolutionIntegerValue(r, promsLeftForOppDiagram[opp]) << endl;
-      printf("numPromsViaCapturedPromotion[%d]: ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) << endl;
-      cout << endl;
-    }
-    */
-    /*
-    cout << "pawnVars\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      for (int j = 0; j < pawnVars[i].size(); j++) {
-        cout << SolutionIntegerValue(r, pawnVars[i][j]) << " ";
-      }
-      cout << "\n";
-    }
+cout << "pawnWhichStartedOn_isPaired:\n";
+for (int d = 0; d < 2; d++) {
+printf("direction %d:\n", d);
+for (int i = 1; i >= 0; i--) {
+for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+  cout << SolutionIntegerValue(r, pawnWhichStartedOn_isPaired[d][i][j])
+       << " ";
+}
+cout << "\n";
+}
+}
+cout << "\n";
 
-    cout << "pawnCosts\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      for (int j = 0; j < pawnCosts[i].size(); j++) {
-        cout << SolutionIntegerValue(r, pawnCosts[i][j]) << " ";
-      }
-      cout << "\n";
-    }
+cout << "zeroCostPromotions:\n";
+for (int i = 1; i >= 0; i--) {
+for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+cout << SolutionIntegerValue(r, zeroCostPromotions[i][j]) << " ";
+}
+cout << "\n";
+}
+cout << "\n";
 
-    cout << "pawnWhichStartedOn_isPaired:\n";
-    for (int d = 0; d < 2; d++) {
-      printf("direction %d:\n", d);
-      for (int i = 0; i < NUM_SIDES; i++) {
-        for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
-          cout << SolutionIntegerValue(r, pawnWhichStartedOn_isPaired[d][i][j])
-               << " ";
-        }
-        cout << "\n";
-      }
-    }
+/*
+cout << "promsViaCapturedPiece:\n";
+for (int i = 1; i >= 0; i--) {
+for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+cout << SolutionIntegerValue(r, promsViaCapturedPiece[i][j]) << " ";
+}
+cout << "\n";
+}
+cout << "\n";
 
-    cout << "zeroCostPromotions:\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
-        cout << SolutionIntegerValue(r, zeroCostPromotions[i][j]) << " ";
-      }
-      cout << "\n";
-    }
+cout << "numPromsViaCapturedBasePiece:\n";
+for (int i = 1; i >= 0; i--) {
+cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) << endl;
+}
+cout << "\n";
 
-    cout << "promsViaCapturedPiece:\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      for (int j = 0; j < BOARD_SIDE_LENGTH; j++) {
-        cout << SolutionIntegerValue(r, promsViaCapturedPiece[i][j]) << " ";
-      }
-      cout << "\n";
-    }
+cout << "numPromsViaCapturedPromotion:\n";
+for (int i = 1; i >= 0; i--) {
+cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) << endl;
+}
+cout << "\n";
 
-    cout << "numPromsViaCapturedBasePiece:\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]);
-    }
-    cout << "numPromsViaCapturedPromotion:\n";
-    for (int i = 0; i < NUM_SIDES; i++) {
-      cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]);
-    }
-    */
+cout << "promsLeftForOppDiagram:\n";
+for (int i = 1; i >= 0; i--) {
+cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+}
+cout << "\n";
+/*
+for (int i = 1; i >= 0; i--) {
+  int opp = (i + 1) % NUM_SIDES;
+  printf("minPromotions[%d]: ", i);
+  cout << SolutionIntegerValue(r, minPromotions[i]) << endl;
+  printf("pawnCostSum[%d]: ", i);
+  cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+  cout << endl;
+
+  printf("promsLeftForOppDiagram[%d]: ", i);
+  cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+  printf("pairsGoTo[%d]: ", i);
+  cout << SolutionIntegerValue(r, pairsGoTo[i]) << endl;
+  printf("numZeroCostPromotions[%d]: ", i);
+  cout << SolutionIntegerValue(r, numZeroCostPromotions[i]) << endl;
+  printf("numPromsViaCapturedPiece[%d]: ", i);
+  cout << SolutionIntegerValue(r, numPromsViaCapturedPiece[i]) << endl;
+  cout << endl;
+
+  printf("numCapturedBasePieces[%d]: ", opp);
+  cout << SolutionIntegerValue(r, numCapturedBasePieces[opp]) << endl;
+  printf("numPromsViaCapturedBasePiece[%d]:, ", i);
+  cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
+endl; printf("promsLeftForOppDiagram[%d]: ", opp); cout <<
+SolutionIntegerValue(r, promsLeftForOppDiagram[opp]) << endl;
+  printf("numPromsViaCapturedPromotion[%d]: ", i);
+  cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) <<
+endl; cout << endl;
+}
+
+cout << "numPromsViaCapturedBasePiece:\n";
+for (int i = 1; i >= 0; i--) {
+  cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
+endl;
+}
+cout << "promsLeftForOppDiagram:\n";
+for (int i = 1; i >= 0; i--) {
+  cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+}
+cout << "numPawnsConsumedByPawnsOnBoard:\n";
+for (int i = 1; i >= 0; i--) {
+  cout << SolutionIntegerValue(r, numPawnsConsumedByPawnsOnBoard[i])
+       << endl;
+}
+cout << "pawnCostSum:\n";
+for (int i = 1; i >= 0; i--) {
+  cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+
+}
+*/
   }));
 
   const CpSolverResponse response = SolveCpModel(cp_model.Build(), &model);

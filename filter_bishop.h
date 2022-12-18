@@ -12,13 +12,12 @@ typedef struct promo_info {
 
 promo_info bishop_affected_promotion_info(position p) {
   int num_pawns[NUM_SIDES];
-  int num_base;
   int promotions[NUM_SIDES] = {0};
   int total_base_capturable_pieces[NUM_SIDES] = {0};
   for (int i = 0; i < NUM_SIDES; i++) {
     num_pawns[i] = _mm_popcnt_u64(p.sides[i].pawns);
     for (int j = 0; j < NUM_PIECE_TYPES_LESS_KING; j++) {
-      num_base = _mm_popcnt_u64(p.sides[i].pieces[j]);
+      int num_base = _mm_popcnt_u64(p.sides[i].pieces[j]);
       int d = num_base - BASE_PIECES[0][j];
       if (d > 0) {
         promotions[i] += d;
@@ -30,9 +29,10 @@ promo_info bishop_affected_promotion_info(position p) {
         _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & WHITE_SQ_MASK);
     int num_black_sq_bishops =
         _mm_popcnt_u64(p.sides[i].pieces[BISHOP] & BLACK_SQ_MASK);
-    if (_mm_popcnt_u64(p.sides[i].pieces[BISHOP]) &&
+    if (_mm_popcnt_u64(p.sides[i].pieces[BISHOP]) > 1 &&
         (num_black_sq_bishops == 0 || num_white_sq_bishops == 0)) {
       promotions[i] += 1;
+      total_base_capturable_pieces[i] -= 1;
     }
   }
 

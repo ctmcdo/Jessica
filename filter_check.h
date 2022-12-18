@@ -31,12 +31,12 @@
 
 enum CHECK_ERROR_CODES {
   TOUCHING_KINGS = 1,
-  SIDE0_CHECKED_BY_KNIGHT,                                     // 2
-  SIDE0_CHECKED_BY_SLIDING_PIECE,                              // 3
-  SIDE0_CHECKED_BY_PAWN,                                       // 4
+  SIDE_IN_WAITING_CHECKED_BY_KNIGHT,                           // 2
+  SIDE_IN_WAITING_CHECKED_BY_SLIDING_PIECE,                    // 3
+  SIDE_IN_WAITING_CHECKED_BY_PAWN,                             // 4
   MORE_THAN_1_CHECKING_KNIGHT,                                 // 5
   MORE_THAN_1_CHECKING_PAWN,                                   // 6
-  SIDE1_IN_CHECK_WHILE_ENPASSANT,                              // 7
+  SIDE_TO_MOVE_IN_CHECK_WHILE_ENPASSANT,                       // 7
   MORE_THAN_2_CHECKING_CHESSMEN,                               // 8
   MORE_THAN_1_CHECKING_BISHOP,                                 // 9
   CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS,                        // 10
@@ -47,9 +47,9 @@ enum CHECK_ERROR_CODES {
   CHECKED_BY_PAWN_NO_PREVIOUS_SQUARE,                          // 15
   CHECKED_BY_KNIGHT_NOT_ON_PROMOTION_RANK_NO_PREVIOUS_SQUARE,  // 16
   CHECKED_BY_KNIGHT_ON_PROMOTION_RANK_NO_PREVIOUS_SQUARE,      // 17
-  LAYERED_SLIDING_ATTACK_WITH_ONE_CHECKING_PIECE,
-  KNIGHT_DOUBLE_CHECK_NO_INTERSECTION,
-  OBTUSE_ASPECTS,
+  LAYERED_SLIDING_ATTACK_WITH_ONE_CHECKING_PIECE,              // 18
+  KNIGHT_DOUBLE_CHECK_NO_INTERSECTION,                         // 19
+  OBTUSE_ASPECTS,                                              // 20
   ACUTE_SLIDING_ATTACKS_BLOCKED,
   ACUTE_SLIDING_ATTACKS_NO_INTERSECTION,
   SLIDING_ATTACK_BEHIND_CHECKING_PIECE_WHICH_JUST_MOVED
@@ -104,9 +104,9 @@ uint64_t get_occupied_squares_for_side(side s) {
   return checkers;
 }
 
-uint64_t get_occupied_squares(side ps[NUM_SIDES]) {
-  return get_occupied_squares_for_side(ps[0]) +
-         get_occupied_squares_for_side(ps[1]);
+uint64_t get_occupied_squares(position p) {
+  return get_occupied_squares_for_side(p.sides[0]) +
+         get_occupied_squares_for_side(p.sides[1]);
 }
 
 // taken from chessprogrammingwiki->flipping,
@@ -294,40 +294,51 @@ uint64_t get_checking_pawns(uint64_t pawns, uint64_t king) {
   return checking_pawns;
 }
 
-// side 0 is never to move and hence can never be in check
-int validate_checks_side_not_to_move(side ps[NUM_SIDES]) {
-  int king_bit = get_index_of_1st_set_bit(ps[0].pieces[KING]);
-  if (_mm_popcnt_u64(get_knight_moves(king_bit) & ps[1].pieces[KNIGHT])) {
-    return SIDE0_CHECKED_BY_KNIGHT;
+// side in waiting (not to move) can never be in check
+int validate_checks_side_in_waiting(position p) {
+  side us = p.sides[p.side0toMove];
+  side opp = p.sides[!p.side0toMove];
+
+  int king_bit = get_index_of_1st_set_bit(us.pieces[KING]);
+  if (_mm_popcnt_u64(get_knight_moves(king_bit) & opp.pieces[KNIGHT])) {
+    return SIDE_IN_WAITING_CHECKED_BY_KNIGHT;
   }
 
-  uint64_t blocking_chessmen = get_occupied_squares(ps) - ps[1].pieces[QUEEN];
+  uint64_t blocking_chessmen = get_occupied_squares(p) - opp.pieces[QUEEN];
   for (int i = 0; i < MOORE_NEIGHBOURHOOD_SIZE; i++) {
     int other_piece_type = 2 * ((i + 1) % 2);
-    uint64_t other_piece_bb = ps[1].pieces[other_piece_type];
-    if (get_sliding_attack(ps[1].pieces[QUEEN], other_piece_bb,
+    uint64_t other_piece_bb = opp.pieces[other_piece_type];
+    if (get_sliding_attack(opp.pieces[QUEEN], other_piece_bb,
                            blocking_chessmen - other_piece_bb, king_bit, i)
             .bit != NUM_SQUARES) {
-      return SIDE0_CHECKED_BY_SLIDING_PIECE;
+      return SIDE_IN_WAITING_CHECKED_BY_SLIDING_PIECE;
     }
   }
 
-  if (get_checking_pawns(rotate_bitboard_across_board_center(ps[1].pawns),
-                         1UL << ((NUM_SQUARES - 1) - king_bit))) {
-    return SIDE0_CHECKED_BY_PAWN;
+  uint64_t _pawns = opp.pawns;
+  uint64_t king = us.pieces[KING];
+  bool weAreWhite = p.side0toMove == p.side0isBlack;
+  if (weAreWhite) {
+    _pawns = rotate_bitboard_across_board_center(opp.pawns);
+    king = rotate_bitboard_across_board_center(king);
+  }
+  if (get_checking_pawns(_pawns, king)) {
+    return SIDE_IN_WAITING_CHECKED_BY_PAWN;
   }
 
   return 0;
 }
 
-checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
-                                           uint64_t enpassant) {
+checking_info validate_checks_side_to_move(position p) {
+  side us = p.sides[!p.side0toMove];
+  side opp = p.sides[p.side0toMove];
+
   checking_info ci = {0};
 
-  int king_bit = get_index_of_1st_set_bit(ps[1].pieces[KING]);
+  int king_bit = get_index_of_1st_set_bit(us.pieces[KING]);
   // pretend knight on opposition's king's square. The moves such a knight can
   // make are also the squares on which knights can check the king.
-  uint64_t checking_knights = get_knight_moves(king_bit) & ps[0].pieces[KNIGHT];
+  uint64_t checking_knights = get_knight_moves(king_bit) & opp.pieces[KNIGHT];
   int num_checking_knights = _mm_popcnt_u64(checking_knights);
   // no discovery possible with 1 < knights
   if (num_checking_knights > 1) {
@@ -344,8 +355,8 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
 
   int num_sliding_attacks = 0;
   int num_sliding_attacks_by_piece_type[NUM_SLIDING_TYPES] = {0};
-  uint64_t occupied_squares = get_occupied_squares(ps);
-  uint64_t blocking_chessmen = occupied_squares - ps[0].pieces[QUEEN];
+  uint64_t occupied_squares = get_occupied_squares(p);
+  uint64_t blocking_chessmen = occupied_squares - opp.pieces[QUEEN];
   // for i in {NORTH-WEST, NORTH, NORTH-EAST, ..., WEST}
   for (int i = 0; i < MOORE_NEIGHBOURHOOD_SIZE; i++) {
 
@@ -353,9 +364,9 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
     // is orthogonal or diagonal the other potentially checking piece type is
     // rook or bishop, respectively.
     int other_piece_type = 2 * ((i + 1) % 2);
-    uint64_t other_piece_bb = ps[0].pieces[other_piece_type];
+    uint64_t other_piece_bb = opp.pieces[other_piece_type];
     checking_piece cp =
-        get_sliding_attack(ps[0].pieces[QUEEN], ps[0].pieces[other_piece_type],
+        get_sliding_attack(opp.pieces[QUEEN], opp.pieces[other_piece_type],
                            blocking_chessmen - other_piece_bb, king_bit, i);
 
     // If there is a checking piece on this line
@@ -370,7 +381,15 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
     }
   }
 
-  uint64_t checking_pawns = get_checking_pawns(ps[0].pawns, ps[1].pieces[KING]);
+  uint64_t checking_pawns;
+  bool weAreWhite = p.side0toMove != p.side0isBlack;
+  if (weAreWhite) {
+    checking_pawns = rotate_bitboard_across_board_center(get_checking_pawns(
+        rotate_bitboard_across_board_center(opp.pawns),
+        rotate_bitboard_across_board_center(us.pieces[KING])));
+  } else {
+    checking_pawns = get_checking_pawns(opp.pawns, us.pieces[KING]);
+  }
   int num_checking_pawns = _mm_popcnt_u64(checking_pawns);
   if (num_checking_pawns > 1) {
     ci.code = MORE_THAN_1_CHECKING_PAWN;
@@ -398,26 +417,27 @@ checking_info validate_checks_side_to_move(side ps[NUM_SIDES],
     return ci;
 
     // NOTE: this is missing test
-  } else if (enpassant) {
+  } else if (p.enpassant) {
     // Side 1 can't perform enpassant because it's in check so I don't consider
     // this position different from its non-enpassant equivalent.
-    ci.code = SIDE1_IN_CHECK_WHILE_ENPASSANT;
+    ci.code = SIDE_TO_MOVE_IN_CHECK_WHILE_ENPASSANT;
     return ci;
   }
 
-  // if (ps[0]._fr) {
+  // if (opp._fr) {
   // Side 0 rook hasn't moved, and side 1 king can't move into check
-  //  if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & ps[0]._fr) {
+  //  if ((1UL << sliding_attacks_by_piece_type[ROOK].bit) & opp._fr) {
   //   ci.code = CHECKED_BY_ROOK_WITH_CASTLING_RIGHTS;
   //  return ci;
   // }
   //}
 
+  // TODO: this doesn't take account of which side is which etc
   // Starting pawn hasn't moved and opposition king can't move into check
-  if (checking_pawns && (king_bit < ENPASSANT_RANK * BOARD_SIDE_LENGTH)) {
-    ci.code = CHECKED_BY_STARTING_PAWN;
-    return ci;
-  }
+  // if (checking_pawns && (king_bit < ENPASSANT_RANK * BOARD_SIDE_LENGTH)) {
+  // ci.code = CHECKED_BY_STARTING_PAWN;
+  // return ci;
+  //}
 
   if (num_checking_chessmen == 1) {
     return ci;
@@ -455,12 +475,11 @@ checking_info validate_checks(position p) {
     return ci;
   }
 
-  side pseudo_sides[] = {p.sides[p.side0toMove], p.sides[!p.side0toMove]};
-  int code = validate_checks_side_not_to_move(pseudo_sides);
+  int code = validate_checks_side_in_waiting(p);
   if (code) {
     ci.code = code;
     return ci;
   }
 
-  return validate_checks_side_to_move(pseudo_sides, p.enpassant);
+  return validate_checks_side_to_move(p);
 }
