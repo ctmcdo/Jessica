@@ -31,7 +31,7 @@ typedef struct {
   int num_occupiable_squares;
   bool enpassant;
   bool side;
-} threading_struct;
+} create_tree_threading_struct;
 
 uint32_t num_piece_type_permutations(int pawn_slack[NUM_SIDES],
                                      int chessmen_slack,
@@ -199,7 +199,7 @@ void count_from_pieces_helper(
 }
 
 void *count_from_pieces(void *arg) {
-  threading_struct ts = *(threading_struct *)arg;
+  create_tree_threading_struct ts = *(create_tree_threading_struct *)arg;
 
   int pawns[NUM_SIDES];
   int non_fixed_capturable_pieces[NUM_SIDES][NUM_PIECE_TYPES] = {0};
@@ -230,7 +230,7 @@ void *count_from_pieces(void *arg) {
 // Level 4 and 5 account for rooks with castling rights (which we also call
 // fixed rooks) and kings. We thread from this function
 void *count_from_fixed_rooks_and_kings(void *arg) {
-  threading_struct ts = *(threading_struct *)arg;
+  create_tree_threading_struct ts = *(create_tree_threading_struct *)arg;
 
   typedef void *(*fn)(void *);
   fn next_call = count_from_fixed_rooks_and_kings;
@@ -249,7 +249,7 @@ void *count_from_fixed_rooks_and_kings(void *arg) {
     ts.root->children[i] = (position_node *)malloc(sizeof(position_node));
   }
 
-  threading_struct tstructs_out[NUM_FIXED_ROOK_SCENARIOS] = {0};
+  create_tree_threading_struct tstructs_out[NUM_FIXED_ROOK_SCENARIOS] = {0};
   for (int i = 0; i < num_children; i++) {
     tstructs_out[i].root = ts.root->children[i];
     tstructs_out[i].free_pawns[0] = ts.free_pawns[0];
@@ -340,7 +340,7 @@ void count_from_free_pawns(position_node *root, position_node *eerroot,
         count_from_free_pawns(root->children[i], eerroot, 0,
                               num_occupiable_squares - i, enpassant, i);
       } else {
-        threading_struct t = {0};
+        create_tree_threading_struct t = {0};
         t.root = root->children[i];
         t.free_pawns[1] = previous_free_pawns;
         t.free_pawns[0] = i;
