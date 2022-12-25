@@ -12,16 +12,16 @@
 #include "util.h"
 
 #define NUM_THREADS_TO_SAMPLE_POSITIONS_WITH 8
-#define PROCESSED_FEN_MAX_LENGTH             (NUM_SQUARES + 2 + 5 + 1)
 #define TEN_THOUSAND                         10000
 
 // Use samples from test file instead of generating positions ourselves.
-#define USE_TEST_SAMPLES false
+#define USE_TEST_SAMPLES true
 
 long        successes = 0;
 FILE*       test_samples_file;
-const char* test_samples_filepath   = "/home/colin/dev/Jessica/samples/processed/10k_illegal";
-int         test_samples_file_index = 0;
+const char* test_samples_filepath
+    = "/home/colin/dev/Jessica/samples/processed/sortedRng1mLegalFENsUnique";
+int test_samples_file_index = 0;
 
 typedef struct
 {

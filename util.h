@@ -1,5 +1,7 @@
 #include "chess.h"
 
+#define PROCESSED_FEN_MAX_LENGTH (NUM_SQUARES + 1 + 4 + 2 + 3)
+
 uint64_t rcb(int row, int col);
 
 char get_row_num(char n);

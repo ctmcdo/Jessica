@@ -129,7 +129,7 @@ void print_fen(position* p)
     printf("\n");
 }
 
-position retrieve_position_from_fen(char* fen)
+position retrieve_position_from_fen(char fen[PROCESSED_FEN_MAX_LENGTH])
 {
     int  curr        = (NUM_SQUARES - 1) + 2;
     bool blackToMove = fen[curr] == 'b';
@@ -203,7 +203,7 @@ position retrieve_position_from_fen(char* fen)
         case 'p': p.sides[side].pawns += square; break;
         case 'q': p.sides[side].pieces[QUEEN] += square; break;
         case 'r': p.sides[side].pieces[ROOK] += square; break;
-        default: printf("Unexpected piece\n"); exit(1);
+        default: printf("Unexpected piece: %c\n", fen[i]); exit(1);
         }
     }
 
