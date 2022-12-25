@@ -1,4 +1,4 @@
-EXECUTABLE_NAME = Jess
+EXECUTABLE_NAME = Jessica
 
 CC = gcc
 LIBS = -lgmp -lm -L filter_pawn/build/lib -l:libfilter_pawn.so -Wl,-rpath filter_pawn/build/lib
@@ -15,6 +15,4 @@ debug:
 	$(CC) ${INCLUDE} ${SRC} -o ${EXECUTABLE_NAME} $^ ${LIBS} ${CFLAGS} -g
 
 format:
-	find . -name '*.h' ! -path './dependencies/*' \
-		-o -name '*.c' ! -path './dependencies/*' | xargs clang-format -i \
-		&& black tree_piece_perm_gen.py
+	find . -name '*.h' -o -name '*.c' -o -name '.*.cc' | xargs clang-format -i && black tree_piece_perm_gen.py
