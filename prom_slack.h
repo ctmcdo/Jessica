@@ -1,9 +1,10 @@
 #pragma once
 #include "chess.h"
 
-typedef struct {
-  int pawn_slack[NUM_SIDES];
-  int chessmen_slack[NUM_SIDES];
+typedef struct
+{
+    int pawn_slack[NUM_SIDES];
+    int chessmen_slack[NUM_SIDES];
 } slack;
 
 slack promotion_slack(int pawns[NUM_SIDES],
