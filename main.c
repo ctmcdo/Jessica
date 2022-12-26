@@ -19,9 +19,8 @@
 
 long        successes = 0;
 FILE*       test_samples_file;
-const char* test_samples_filepath
-    = "/home/colin/dev/Jessica/samples/processed/sortedRng1mLegalFENsUnique";
-int test_samples_file_index = 0;
+const char* test_samples_filepath   = "/home/colin/dev/Jessica/weirdsample";
+int         test_samples_file_index = 0;
 
 typedef struct
 {
@@ -105,8 +104,8 @@ void* process_positions(void* args)
     }
 
 #else
-    char fen[PROCESSED_FEN_MAX_LENGTH];
-    while (fgets(fen, PROCESSED_FEN_MAX_LENGTH, test_samples_file) != NULL)
+    char fen[PROCESSED_FEN_MAX_LENGTH + 2];
+    while (fgets(fen, PROCESSED_FEN_MAX_LENGTH + 2, test_samples_file) != NULL)
     {
         position p = retrieve_position_from_fen(fen);
         process_positions_helper(&p, gp.onGen_lock);

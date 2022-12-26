@@ -1,6 +1,7 @@
 #include "chess.h"
 
-#define PROCESSED_FEN_MAX_LENGTH (NUM_SQUARES + 1 + 4 + 2 + 3)
+//                                                 w/b                          'a3'
+#define PROCESSED_FEN_MAX_LENGTH (NUM_SQUARES + 1 + 1 + 1 + NUM_BASE_ROOKS + 1 + 2)
 
 uint64_t rcb(int row, int col);
 

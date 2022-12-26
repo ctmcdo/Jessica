@@ -4,7 +4,6 @@
 #include "util.h"
 
 #define a_ASCII_decimal       97
-#define NUM_CORNER_SQUARES    4
 #define PRINT_FORWARD_SLASHES true
 
 void fen_helper(uint64_t chessmen, char symbol, int squares[NUM_SQUARES])
@@ -144,7 +143,7 @@ position retrieve_position_from_fen(char fen[PROCESSED_FEN_MAX_LENGTH])
     }
     else
     {
-        for (int i = 0; i < NUM_CORNER_SQUARES; i++)
+        for (int i = 0; i < NUM_BASE_ROOKS; i++)
         {
             switch (fen[curr])
             {

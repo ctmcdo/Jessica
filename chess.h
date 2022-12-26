@@ -17,6 +17,7 @@
 #define NUM_BASE_KNIGHTS_PSIDE           2
 #define ROOK                             2
 #define NUM_BASE_ROOKS_PSIDE             2
+#define NUM_BASE_ROOKS                   (NUM_SIDES * NUM_BASE_ROOKS_PSIDE)
 #define QUEEN                            3
 #define NUM_BASE_QUEENS_PSIDE            1
 #define KING                             4
