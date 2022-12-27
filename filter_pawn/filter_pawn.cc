@@ -367,160 +367,211 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES],
         cp_model.AddEquality(promsLeftForOppDiagram[i],
                              pairsGoTo[i] + numZeroCostPromotions[i] + numPromsViaCapturedPiece[i]
                                  - numPromsViaCapturedPromotion[opp] - minPromotions[i]);
-        cp_model.Maximize(promsLeftForOppDiagram[i]);
         cp_model.AddGreaterOrEqual(promsLeftForOppDiagram[i], 0);
     }
 
+    IntVar pawnDiagramPieceCaptureBudgets[]
+        = { cp_model.NewIntVar(NUM_CAPTURABLE_CHESSMEN_PSIDE_DOMAIN),
+            cp_model.NewIntVar(NUM_CAPTURABLE_CHESSMEN_PSIDE_DOMAIN) };
     for (int i = 0; i < NUM_SIDES; i++)
     {
-        int    opp = (i + 1) % NUM_SIDES;
-        IntVar pawnDiagramPieceCaptureBudget
-            = cp_model.NewIntVar(NUM_CAPTURABLE_CHESSMEN_PSIDE_DOMAIN);
-        cp_model.AddEquality(pawnDiagramPieceCaptureBudget,
+        int opp = (i + 1) % NUM_SIDES;
+        cp_model.AddEquality(pawnDiagramPieceCaptureBudgets[i],
                              (numCapturedBasePieces[opp] - numPromsViaCapturedBasePiece[i])
                                  + promsLeftForOppDiagram[opp]);
 
-        cp_model.AddGreaterOrEqual(
-            numPawnsConsumedByPawnsOnBoard[opp] + pawnDiagramPieceCaptureBudget, pawnCostSum[i]);
+        cp_model.AddGreaterOrEqual(numPawnsConsumedByPawnsOnBoard[opp]
+                                       + pawnDiagramPieceCaptureBudgets[i],
+                                   pawnCostSum[i]);
     }
 
     Model model;
     model.Add(NewFeasibleSolutionObserver([&](const CpSolverResponse& r) {
         /*
-    cout << "pawnVars\n";
-    for (int i = 1; i >= 0; i--) {
-      if (pawnVars[i].size() == 0) {
-        printf("No pawns for side %d\n", i);
-        continue;
+      cout << "pawnVars\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          if (pawnVars[i].size() == 0)
+          {
+              printf("No pawns for side %d\n", i);
+              continue;
+          }
+          for (int j = pawnVars[i].size() - 1; j >= 0; j--)
+          {
+              cout << SolutionIntegerValue(r, pawnVars[i][j]) << " ";
+          }
+          cout << "\n";
       }
-      for (int j = 0; j < pawnVars[i].size(); j++) {
-        cout << SolutionIntegerValue(r, pawnVars[i][j]) << " ";
-      }
-      cout << "\n";
-    }
-    cout << "\n";
-    cout << "pawnCosts\n";
-    for (int i = 1; i >= 0; i--) {
-      if (pawnVars[i].size() == 0) {
-        printf("No pawns for side %d\n", i);
-        continue;
-      }
-      for (int j = 0; j < pawnCosts[i].size(); j++) {
-        cout << SolutionIntegerValue(r, pawnCosts[i][j]) << " ";
-      }
-      cout << "\n";
-    }
+      cout << endl;
 
-    /*
-    cout << "pawnConsumedPawnWhichStartedOn:\n";
-    for (int i = 1; i >= 0; i--) {
-    for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
-    cout << SolutionIntegerValue(r, pawnConsumedPawnWhichStartedOn[i][j])
-         << " ";
-    }
-    cout << "\n";
-    }
-    cout << "\n";
+      cout << "pawnCosts\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          if (pawnVars[i].size() == 0)
+          {
+              printf("No pawns for side %d\n", i);
+              continue;
+          }
+          for (int j = pawnVars[i].size() - 1; j >= 0; j--)
+          {
+              cout << SolutionIntegerValue(r, pawnCosts[i][j]) << " ";
+          }
+          cout << "\n";
+      }
+      cout << endl;
 
-    cout << "pawnWhichStartedOn_isPaired:\n";
-    for (int d = 0; d < 2; d++) {
-    printf("direction %d:\n", d);
-    for (int i = 1; i >= 0; i--) {
-    for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
-      cout << SolutionIntegerValue(r, pawnWhichStartedOn_isPaired[d][i][j])
+      cout << "numPromsViaCapturedPiece:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, numPromsViaCapturedPiece[i]) << endl;
+      }
+      cout << endl;
+
+      cout << "numPromsViaCapturedPromotions:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) << endl;
+      }
+      cout << endl;
+
+      cout << "promsLeftForOppDiagram:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+      }
+      cout << endl;
+
+      cout << "numPawnsConsumedByPawnsOnBoard:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, numPawnsConsumedByPawnsOnBoard[i]) << endl;
+      }
+      cout << endl;
+
+      cout << "pawnDiagramPieceCaptureBudgets:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, pawnDiagramPieceCaptureBudgets[i]) << endl;
+      }
+      cout << endl;
+
+      cout << "pawnCostSum:\n";
+      for (int i = 1; i >= 0; i--)
+      {
+          cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+      }
+      cout << endl;
+
+      /*
+      cout << "pawnConsumedPawnWhichStartedOn:\n";
+      for (int i = 1; i >= 0; i--) {
+      for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+      cout << SolutionIntegerValue(r, pawnConsumedPawnWhichStartedOn[i][j])
            << " ";
-    }
-    cout << "\n";
-    }
-    }
-    cout << "\n";
+      }
+      cout << "\n";
+      }
+      cout << "\n";
 
-    cout << "zeroCostPromotions:\n";
-    for (int i = 1; i >= 0; i--) {
-    for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
-    cout << SolutionIntegerValue(r, zeroCostPromotions[i][j]) << " ";
-    }
-    cout << "\n";
-    }
-    cout << "\n";
+      cout << "pawnWhichStartedOn_isPaired:\n";
+      for (int d = 0; d < 2; d++) {
+      printf("direction %d:\n", d);
+      for (int i = 1; i >= 0; i--) {
+      for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+        cout << SolutionIntegerValue(r, pawnWhichStartedOn_isPaired[d][i][j])
+             << " ";
+      }
+      cout << "\n";
+      }
+      }
+      cout << "\n";
 
-    /*
-    cout << "promsViaCapturedPiece:\n";
-    for (int i = 1; i >= 0; i--) {
-    for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
-    cout << SolutionIntegerValue(r, promsViaCapturedPiece[i][j]) << " ";
-    }
-    cout << "\n";
-    }
-    cout << "\n";
+      cout << "zeroCostPromotions:\n";
+      for (int i = 1; i >= 0; i--) {
+      for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+      cout << SolutionIntegerValue(r, zeroCostPromotions[i][j]) << " ";
+      }
+      cout << "\n";
+      }
+      cout << "\n";
 
-    cout << "numPromsViaCapturedBasePiece:\n";
-    for (int i = 1; i >= 0; i--) {
-    cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) << endl;
-    }
-    cout << "\n";
+      /*
+      cout << "promsViaCapturedPiece:\n";
+      for (int i = 1; i >= 0; i--) {
+      for (int j = BOARD_SIDE_LENGTH - 1; j >= 0; j--) {
+      cout << SolutionIntegerValue(r, promsViaCapturedPiece[i][j]) << " ";
+      }
+      cout << "\n";
+      }
+      cout << "\n";
 
-    cout << "numPromsViaCapturedPromotion:\n";
-    for (int i = 1; i >= 0; i--) {
-    cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) << endl;
-    }
-    cout << "\n";
+      cout << "numPromsViaCapturedBasePiece:\n";
+      for (int i = 1; i >= 0; i--) {
+      cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) << endl;
+      }
+      cout << "\n";
 
-    cout << "promsLeftForOppDiagram:\n";
-    for (int i = 1; i >= 0; i--) {
-    cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
-    }
-    cout << "\n";
-    /*
-    for (int i = 1; i >= 0; i--) {
-      int opp = (i + 1) % NUM_SIDES;
-      printf("minPromotions[%d]: ", i);
-      cout << SolutionIntegerValue(r, minPromotions[i]) << endl;
-      printf("pawnCostSum[%d]: ", i);
-      cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
-      cout << endl;
+      cout << "numPromsViaCapturedPromotion:\n";
+      for (int i = 1; i >= 0; i--) {
+      cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) << endl;
+      }
+      cout << "\n";
 
-      printf("promsLeftForOppDiagram[%d]: ", i);
+      cout << "promsLeftForOppDiagram:\n";
+      for (int i = 1; i >= 0; i--) {
       cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
-      printf("pairsGoTo[%d]: ", i);
-      cout << SolutionIntegerValue(r, pairsGoTo[i]) << endl;
-      printf("numZeroCostPromotions[%d]: ", i);
-      cout << SolutionIntegerValue(r, numZeroCostPromotions[i]) << endl;
-      printf("numPromsViaCapturedPiece[%d]: ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedPiece[i]) << endl;
-      cout << endl;
+      }
+      cout << "\n";
+      /*
+      for (int i = 1; i >= 0; i--) {
+        int opp = (i + 1) % NUM_SIDES;
+        printf("minPromotions[%d]: ", i);
+        cout << SolutionIntegerValue(r, minPromotions[i]) << endl;
+        printf("pawnCostSum[%d]: ", i);
+        cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+        cout << endl;
 
-      printf("numCapturedBasePieces[%d]: ", opp);
-      cout << SolutionIntegerValue(r, numCapturedBasePieces[opp]) << endl;
-      printf("numPromsViaCapturedBasePiece[%d]:, ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
-    endl; printf("promsLeftForOppDiagram[%d]: ", opp); cout <<
-    SolutionIntegerValue(r, promsLeftForOppDiagram[opp]) << endl;
-      printf("numPromsViaCapturedPromotion[%d]: ", i);
-      cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) <<
-    endl; cout << endl;
-    }
+        printf("promsLeftForOppDiagram[%d]: ", i);
+        cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+        printf("pairsGoTo[%d]: ", i);
+        cout << SolutionIntegerValue(r, pairsGoTo[i]) << endl;
+        printf("numZeroCostPromotions[%d]: ", i);
+        cout << SolutionIntegerValue(r, numZeroCostPromotions[i]) << endl;
+        printf("numPromsViaCapturedPiece[%d]: ", i);
+        cout << SolutionIntegerValue(r, numPromsViaCapturedPiece[i]) << endl;
+        cout << endl;
 
-    cout << "numPromsViaCapturedBasePiece:\n";
-    for (int i = 1; i >= 0; i--) {
-      cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
-    endl;
-    }
-    cout << "promsLeftForOppDiagram:\n";
-    for (int i = 1; i >= 0; i--) {
-      cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
-    }
-    cout << "numPawnsConsumedByPawnsOnBoard:\n";
-    for (int i = 1; i >= 0; i--) {
-      cout << SolutionIntegerValue(r, numPawnsConsumedByPawnsOnBoard[i])
-           << endl;
-    }
-    cout << "pawnCostSum:\n";
-    for (int i = 1; i >= 0; i--) {
-      cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+        printf("numCapturedBasePieces[%d]: ", opp);
+        cout << SolutionIntegerValue(r, numCapturedBasePieces[opp]) << endl;
+        printf("numPromsViaCapturedBasePiece[%d]:, ", i);
+        cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
+      endl; printf("promsLeftForOppDiagram[%d]: ", opp); cout <<
+      SolutionIntegerValue(r, promsLeftForOppDiagram[opp]) << endl;
+        printf("numPromsViaCapturedPromotion[%d]: ", i);
+        cout << SolutionIntegerValue(r, numPromsViaCapturedPromotion[i]) <<
+      endl; cout << endl;
+      }
 
-    }
-    */
+      cout << "numPromsViaCapturedBasePiece:\n";
+      for (int i = 1; i >= 0; i--) {
+        cout << SolutionIntegerValue(r, numPromsViaCapturedBasePiece[i]) <<
+      endl;
+      }
+      cout << "promsLeftForOppDiagram:\n";
+      for (int i = 1; i >= 0; i--) {
+        cout << SolutionIntegerValue(r, promsLeftForOppDiagram[i]) << endl;
+      }
+      cout << "numPawnsConsumedByPawnsOnBoard:\n";
+      for (int i = 1; i >= 0; i--) {
+        cout << SolutionIntegerValue(r, numPawnsConsumedByPawnsOnBoard[i])
+             << endl;
+      }
+      cout << "pawnCostSum:\n";
+      for (int i = 1; i >= 0; i--) {
+        cout << SolutionIntegerValue(r, pawnCostSum[i]) << endl;
+
+      }
+      */
     }));
 
     const CpSolverResponse response = SolveCpModel(cp_model.Build(), &model);
