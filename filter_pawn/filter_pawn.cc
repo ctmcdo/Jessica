@@ -574,7 +574,8 @@ extern "C" bool FilterPawn(uint64_t _pawns[NUM_SIDES],
       */
     }));
 
-    model.GetOrCreate<SatParameters>()->set_cp_model_presolve(false);
+    model.GetOrCreate<SatParameters>()->set_num_search_workers(1);
+    model.GetOrCreate<SatParameters>()->set_cp_model_probing_level(0);
     const CpSolverResponse response = SolveCpModel(cp_model.Build(), &model);
     if (response.status() == CpSolverStatus::OPTIMAL
         || response.status() == CpSolverStatus::FEASIBLE)

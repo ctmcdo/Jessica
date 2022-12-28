@@ -49,11 +49,13 @@ enum CHECK_ERROR_CODES
     CHECKED_BY_KNIGHT_NOT_ON_PROMOTION_RANK_NO_PREVIOUS_SQUARE,  // 16
     CHECKED_BY_KNIGHT_ON_PROMOTION_RANK_NO_PREVIOUS_SQUARE,      // 17
     LAYERED_SLIDING_ATTACK_WITH_ONE_CHECKING_PIECE,              // 18
-    KNIGHT_DOUBLE_CHECK_NO_INTERSECTION,                         // 19
+    KNIGHT_DISCOVERY_NOT_POSSIBLE,                               // 19
     OBTUSE_ASPECTS,                                              // 20
     ACUTE_SLIDING_ATTACKS_BLOCKED,
     ACUTE_SLIDING_ATTACKS_NO_INTERSECTION,
-    SLIDING_ATTACK_BEHIND_CHECKING_PIECE_WHICH_JUST_MOVED
+    SLIDING_ATTACK_BEHIND_CHECKING_PIECE_WHICH_JUST_MOVED,
+    RIGHT_ANGLE_DIAGONAL_ASPECT,
+    RIGHT_ANGLE_ORTHOGONAL_ASPECT_NO_PROMOTION_POSSIBILITY
 };
 
 typedef struct checking_info
@@ -522,16 +524,65 @@ checking_info validate_checks_side_to_move(position* p)
         int      nrow = get_row_num(nbit);
         if (!(get_knight_moves(nbit) & ray) && (nrow != 0 && nrow != (BOARD_SIDE_LENGTH - 1)))
         {
-            ci.code = KNIGHT_DOUBLE_CHECK_NO_INTERSECTION;
+            ci.code = KNIGHT_DISCOVERY_NOT_POSSIBLE;
         }
         return ci;
     }
 
     int aspect_diff = abs(sliding_attacks[0].aspect - sliding_attacks[1].aspect);
     assert(aspect_diff != 0);
+    int krow   = get_row_num(king_bit);
+    int sa0row = get_row_num(sliding_attacks[0].bit);
+    int sa1row = get_row_num(sliding_attacks[1].bit);
     if ((aspect_diff > 2 && aspect_diff < 6))
     {
         ci.code = OBTUSE_ASPECTS;
+        return ci;
+    }
+    else if (aspect_diff == 2 || aspect_diff == 6)
+    {
+        if (sliding_attacks[0].aspect % 2 == 1)
+        {
+            ci.code = RIGHT_ANGLE_DIAGONAL_ASPECT;
+            return ci;
+        }
+
+        if (krow == 1)
+        {
+            if ((sa0row == 0 || sa1row == 0))
+            {
+                return ci;
+            }
+        }
+        else if (krow == (BOARD_SIDE_LENGTH - 2))
+        {
+
+            if (sa0row == (BOARD_SIDE_LENGTH - 1) || sa1row == (BOARD_SIDE_LENGTH - 1))
+            {
+                return ci;
+            }
+        }
+        else if (krow == 0)
+        {
+            bool sa0IsAdjacent = (sa0row == 0 && abs(sliding_attacks[0].bit - king_bit) == 1);
+            if (sa0IsAdjacent || (sa1row == 0 && abs(sliding_attacks[1].bit - king_bit) == 1))
+            {
+                return ci;
+            }
+        }
+        else if (krow == (BOARD_SIDE_LENGTH - 1))
+        {
+            bool sa0IsAdjacent = (sa0row == (BOARD_SIDE_LENGTH - 1)
+                                  && abs(sliding_attacks[0].bit - king_bit) == 1);
+            if (sa0IsAdjacent
+                || (sa1row == (BOARD_SIDE_LENGTH - 1)
+                    && abs(sliding_attacks[1].bit - king_bit) == 1))
+            {
+                return ci;
+            }
+        }
+
+        ci.code = RIGHT_ANGLE_ORTHOGONAL_ASPECT_NO_PROMOTION_POSSIBILITY;
         return ci;
     }
 
